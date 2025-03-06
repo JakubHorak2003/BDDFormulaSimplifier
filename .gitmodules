@@ -1,0 +1,4 @@
+[submodule "external/q3b"]
+	path = external/q3b
+	url = https://github.com/martinjonas/Q3B.git
+	branch = dev
