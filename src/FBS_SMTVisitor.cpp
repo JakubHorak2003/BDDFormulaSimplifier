@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <numeric>
 
-#include "FAS_SMTVisitor.h"
+#include "FBS_SMTVisitor.h"
+#include "FBSLogger.h"
+
 #include "Logger.h"
 #include "Model.h"
 #include "FormulaSimplifier.h"
@@ -312,12 +314,13 @@ antlrcpp::Any FAS_SMTVisitor::visitCommand(SMTLIBv2Parser::CommandContext* comma
                 ev.push_back(x);
         }
         auto expr = z3::mk_and(ev);
+        logger.DumpFormula("in.smt2", expr);
+        logger.DumpFormula("out.smt2", expr);
         
         FormulaSimplifier fs(expr);
         auto new_expr = fs.Run();
 
-        dumpFormula("out.smt2", new_expr);
-        dumpFormula("in.smt2", expr);
+        logger.DumpFormula("out.smt2", new_expr);
     }
     else if (command->cmd_getModel())
     {

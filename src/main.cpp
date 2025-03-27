@@ -1,7 +1,7 @@
 #include <iostream>
 #include <string>
 
-#include "FAS_SMTVisitor.h"
+#include "FBS_SMTVisitor.h"
 
 #include "antlr4-runtime.h"
 #include "SMTLIBv2Lexer.h"

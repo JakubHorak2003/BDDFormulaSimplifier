@@ -1,8 +1,9 @@
+#pragma once
 #include <map>
+#include <list>
 #include <z3++.h>
 #include "ExprToBDDTransformer.h"
-
-void dumpFormula(const std::string& filename, z3::expr formula);
+#include "SimplifierThread.h"
 
 class FormulaSimplifier
 {
@@ -11,20 +12,12 @@ public:
 
     z3::expr Run();
 
-    z3::expr Simplify(z3::expr e);
+    z3::expr Simplify(z3::expr e, std::list<SimplifierThread>::iterator& t_curr);
 
-    z3::expr BDDToFormula(DdNode* node);
-    z3::expr BDDToFormula(ExprToBDDTransformer& tr, const BDD& bdd);
-
-    void CollectVars(z3::expr e);
+    void LaunchThreads(z3::expr e);
 
 private:
-    void dumpBddToDot(const BDD& bdd);
-
     z3::expr expr;
-    int next_dot_id = 0;
 
-    std::map<std::string, z3::expr> vars;
-    std::map<const DdNode*, z3::expr> expr_cache;
-    std::map<int, std::pair<std::string, int>> idx_to_var;
+    std::list<SimplifierThread> threads;
 };

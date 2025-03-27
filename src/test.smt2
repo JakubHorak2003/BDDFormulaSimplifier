@@ -1,7 +1,8 @@
 (set-info :smt-lib-version 2.6)
 (set-logic BV)
 (set-info :status unsat)
+(declare-fun x () (_ BitVec 32))
 
-(assert (exists ((x (_ BitVec 8))) (forall ((y (_ BitVec 8))) (= (bvmul x y) #x00) ) ))
+(assert (= x #x00000000))
 (check-sat)
 (exit)
