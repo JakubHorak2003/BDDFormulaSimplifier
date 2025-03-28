@@ -4,11 +4,9 @@ import sys
 from collections import defaultdict
 
 def is_solved(result):
-    """Return True if the result indicates a solved benchmark (sat or unsat)."""
     return result.lower() in {"sat", "unsat"}
 
 def main():
-    # Use the first command-line argument as the results filename, defaulting to "results.txt"
     if len(sys.argv) < 2:
         filename = "results.txt"
     else:
@@ -17,12 +15,11 @@ def main():
     total_benchmarks = 0
     solved_by_all = 0
     solved_by_none = 0
-    solved_by_one_counts = defaultdict(int)  # counts for each tool if only one solved the benchmark
+    solved_by_one_counts = defaultdict(int)
     conflicts = 0
     conflicts_benchmarks = []
 
-    # Track individual tool performance
-    tool_names = ["z3", "q3b", "my_tool"]
+    tool_names = ["z3", "q3b", "cvc5", "myapp then z3", "myapp then cvc5"]
     tool_solved_counts = defaultdict(int)
     
     try:
@@ -30,22 +27,18 @@ def main():
             for line in f:
                 line = line.strip()
                 if not line:
-                    continue  # skip empty lines
+                    continue 
 
-                # Expected format: benchmark, z3_result, q3b_result, my_tool_result
                 parts = [part.strip() for part in line.split(",")]
-                if len(parts) != 4:
+                if len(parts) != len(tool_names) + 1:
                     print(f"Skipping line with unexpected format: {line}")
                     continue
 
-                benchmark, z3_res, q3b_res, my_tool_res = parts
+                benchmark, *results = parts
                 total_benchmarks += 1
 
-                # Build a dictionary with tool names and their result (lowercase)
                 results = {
-                    "z3": z3_res,
-                    "q3b": q3b_res,
-                    "my_tool": my_tool_res,
+                    tool: res for tool, res in zip(tool_names, results)
                 }
                 solved_tools = {tool: res.lower() for tool, res in results.items() if is_solved(res)}
                 

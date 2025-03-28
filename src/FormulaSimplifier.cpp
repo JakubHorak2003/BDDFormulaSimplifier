@@ -200,7 +200,5 @@ std::vector<z3::expr> FormulaSimplifier::PickResults(const std::vector<z3::expr>
 {
     if (approx.size() <= 1)
         return approx;
-    if (approx.size() <= 4)
-        return {approx[0], approx.back()};
-    return {approx[0], approx[approx.size() / 2], approx.back()};
+    return {approx[0], approx.back()};
 }
