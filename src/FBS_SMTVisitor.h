@@ -11,10 +11,10 @@
 
 #include "SMTLIBv2BaseVisitor.h"
 
-class FAS_SMTVisitor : public SMTLIBv2BaseVisitor
+class FBS_SMTVisitor : public SMTLIBv2BaseVisitor
 {
 public:
-    virtual ~FAS_SMTVisitor() = default;
+    virtual ~FBS_SMTVisitor() = default;
     
     Result Run(SMTLIBv2Parser::ScriptContext*);
 

@@ -8,87 +8,113 @@
 
 z3::expr Translate(z3::expr e, z3::context& ctx)
 {
-    return z3::expr(ctx, Z3_translate(e.ctx(), e, ctx));
+    auto res = z3::expr(ctx, Z3_translate(e.ctx(), e, ctx));
+    return res;
+}
+
+std::vector<z3::expr> Translate(const std::vector<z3::expr>& es, z3::context& ctx)
+{
+    std::vector<z3::expr> res;
+    int sz = (int)es.size();
+    for (int i = 0; i < sz; ++i)
+        res.push_back(Translate(es[i], ctx));
+    return res;
+}
+
+z3::expr_vector GetQuantBoundVars(z3::expr e)
+{
+    int bound = Z3_get_quantifier_num_bound(e.ctx(), e);
+
+    z3::expr_vector res(e.ctx());
+    for (int i = 0; i < bound; ++i)
+    {
+        Z3_symbol z3_symbol = Z3_get_quantifier_bound_name(e.ctx(), e, i);
+        Z3_sort z3_sort = Z3_get_quantifier_bound_sort(e.ctx(), e, i);
+
+        z3::symbol symbol(e.ctx(), z3_symbol);
+        z3::sort sort(e.ctx(), z3_sort);
+
+        res.push_back(e.ctx().constant(symbol, sort));
+    }
+
+    return res;
 }
 
 void SimplifierThread::Run()
 {
     logger.Log("Collecting vars...");
-    CollectVars(expr);
-    logger.Log("Collecting vars finished");
+    expr = CollectVars(expr, 0);
 
-    if (overapproximate)
-        RunOver();
-    else
-        RunUnder();
+    logger.Log("Creating transformer...");
+    logger.DumpFormula("h.smt2", expr);
+    transformer = std::make_unique<ExprToBDDTransformer>(expr.ctx(), expr, Config());
+
+    logger.Log("Running approximations...");
+    RunApprox();
+
+    finished = true;
 }
 
-void SimplifierThread::RunOver()
+void SimplifierThread::RunApprox()
 {
+    if (Solver::resultComputed)
+        return;
+        
+    if (!overapproximate)
+        transformer->setApproximationType(ZERO_EXTEND);
+
     int bw = 1;
     int prec = 1;
-    while (bw <= 128)
+    std::vector<int> node_counts;
+    node_counts.push_back(0);
+    while (bw <= 128 && prec <= 16)
     {
-        logger.Log("Running expr to bdd (over; bw = " + std::to_string(bw) + "; prec = " + std::to_string(prec) + ")...");
-        auto bdds = transformer.ProcessOverapproximation(bw, prec);
+        // logger.Log("Running expr to bdd (over = " + std::to_string(overapproximate) +
+        //             "; bw = " + std::to_string(bw) + "; prec = " + std::to_string(prec) + ")...");
+        BDDInterval bdds;
+        if (overapproximate)
+            bdds = transformer->ProcessOverapproximation(bw, prec);
+        else
+            bdds = transformer->ProcessUnderapproximation(bw, prec);
         if (Solver::resultComputed)
             return;
-        //logger.DumpFormulaBDD(expr, bdds.upper);
+        const auto& bdd = overapproximate ? bdds.upper : bdds.lower;
+        //logger.DumpFormulaBDD(expr, bdd.upper);
 
-        if (bdds.upper.IsZero())
+        if (overapproximate && bdd.IsZero())
         {
             logger.Log("Bdd always false");
-            result = expr.ctx().bool_val(false);
+            result.clear();
+            result.push_back(expr.ctx().bool_val(false));
             return;
         }
-        if (!bdds.upper.IsOne())
-        {
-            logger.Log("Useful result returned (" + std::to_string(bdds.upper.nodeCount()) + " nodes)");
-        }
-        auto cand = BDDToFormula(bdds.upper);
-        if (Solver::resultComputed)
-            return;
-        result = cand;
-
-        if (transformer.OperationApproximationHappened())
-            prec *= 4;
-        else if (bw == 1)
-            bw = 2;
-        else
-            bw += 2;
-    }
-}
-
-void SimplifierThread::RunUnder()
-{
-    transformer.setApproximationType(ZERO_EXTEND);
-
-    int bw = 1;
-    int prec = 1;
-    while (bw <= 128)
-    {
-        logger.Log("Running expr to bdd (under; bw = " + std::to_string(bw) + "; prec = " + std::to_string(prec) + ")...");
-        auto bdds = transformer.ProcessUnderapproximation(bw, prec);
-        if (Solver::resultComputed)
-            return;
-        //logger.DumpFormulaBDD(expr, bdds.lower);
-
-        if (bdds.lower.IsOne())
+        if (!overapproximate && bdd.IsOne())
         {
             logger.Log("Bdd always true");
-            result = FixUnder(expr.ctx().bool_val(true), bw);
+            result.clear();
+            result.push_back(FixUnder(expr.ctx().bool_val(true), bw));
             return;
         }
-        if (!bdds.lower.IsZero())
-        {
-            logger.Log("Useful result returned (" + std::to_string(bdds.lower.nodeCount()) + " nodes)");
-        }
-        auto cand = FixUnder(BDDToFormula(bdds.lower), bw);
-        if (Solver::resultComputed)
-            return;
-        result = cand;
 
-        if (transformer.OperationApproximationHappened())
+        int nc = bdd.nodeCount();
+        if (nc != node_counts.back() && !bdd.IsZero() && !bdd.IsOne())
+        {
+            logger.Log("Useful result returned (" + std::to_string(bdd.nodeCount()) + " nodes)");
+            auto cand = BDDToFormula(bdd);
+            if (!overapproximate)
+                cand = FixUnder(cand, bw);
+            if (Solver::resultComputed)
+                return;
+            while (nc < node_counts.back())
+            {
+                node_counts.pop_back();
+                result.pop_back();
+            }
+            node_counts.push_back(nc);
+            result.push_back(cand);
+        }
+
+        if (transformer->OperationApproximationHappened())
             prec *= 4;
         else if (bw == 1)
             bw = 2;
@@ -127,7 +153,7 @@ z3::expr SimplifierThread::BDDToFormula(const BDD& bdd)
 {
     expr_cache.clear();
     idx_to_var.clear();
-    for (const auto&[name, bvec] : transformer.vars)
+    for (const auto&[name, bvec] : transformer->vars)
     {
         for (int i = 0; i < bvec.bitnum(); ++i)
         {
@@ -148,24 +174,53 @@ z3::expr SimplifierThread::BDDToFormula(const BDD& bdd)
     return ne;
 }
 
-void SimplifierThread::CollectVars(z3::expr e)
+z3::expr SimplifierThread::CollectVars(z3::expr e, int n_bound)
 {
     if (Solver::resultComputed)
-        return;
+        return e;
+
+    if (e.is_var())
+    {
+        int idx = Z3_get_index_value(e.ctx(), e);
+        if (idx >= n_bound)
+        {
+            auto res = pre_bound[pre_bound.size() + n_bound - idx - 1];
+            vars.emplace(res.to_string(), res);
+            std::cout << "Pre bound subst: idx = " << idx << ", var = " << res << '\n';
+            return res;
+        }
+        return e;
+    }
 
     if (e.is_const() && !e.is_numeral())
     {
         vars.emplace(e.to_string(), e);
     }
-    else if (e.is_app())
+    
+    if (e.is_app())
     {
-        for (unsigned i = 0; i < e.num_args(); ++i)
-            CollectVars(e.arg(i));
+        z3::func_decl f = e.decl();
+        unsigned num = e.num_args();
+
+        auto decl_kind = f.decl_kind();
+
+        z3::expr_vector sim(e.ctx());
+        for (unsigned i = 0; i < num; ++i)
+            sim.push_back(CollectVars(e.arg(i), n_bound));
+
+        return f(sim);
     }
-    else if (e.is_quantifier())
+
+    if (e.is_quantifier())
     {
-        CollectVars(e.body());
+        auto bound = GetQuantBoundVars(e);
+
+        if (e.is_forall())
+            return z3::forall(bound, CollectVars(e.body(), n_bound + (int)bound.size()));
+        return z3::exists(bound, CollectVars(e.body(), n_bound + (int)bound.size()));
     }
+
+    return e;
 }
 
 z3::expr SimplifierThread::FixUnder(z3::expr e, int bw)

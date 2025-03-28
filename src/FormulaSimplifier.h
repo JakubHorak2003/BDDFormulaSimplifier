@@ -14,9 +14,12 @@ public:
 
     z3::expr Simplify(z3::expr e, std::list<SimplifierThread>::iterator& t_curr);
 
-    void LaunchThreads(z3::expr e);
+    void LaunchThreads(z3::expr e, std::vector<z3::expr>& bound);
 
 private:
+    z3::expr RemoveInternal(z3::expr e);
+
+    std::vector<z3::expr> PickResults(const std::vector<z3::expr>& approx);
     z3::expr expr;
 
     std::list<SimplifierThread> threads;

@@ -3,6 +3,8 @@
 
 #include "FBSLogger.h"
 
+FBSLogger logger;
+
 void FBSLogger::Log(const std::string& str)
 {
     std::scoped_lock(output_mutex);
@@ -11,8 +13,10 @@ void FBSLogger::Log(const std::string& str)
 
 void FBSLogger::LogSafe(const std::string& str)
 {
+    if (!enabled)
+        return;
     auto tm = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - start_tp);
-    std::cout << "[Thread " << std::this_thread::get_id() << ", " << tm.count() << "]: " << str << '\n';
+    std::cout << "[Thread " << std::this_thread::get_id() << ", " << tm.count() << "]: " << str << std::endl;
 }
 
 void FBSLogger::DumpBDD(const BDD& bdd)

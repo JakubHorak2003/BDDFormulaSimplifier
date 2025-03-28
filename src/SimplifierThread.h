@@ -1,31 +1,37 @@
 #pragma once
 #include <map>
 #include <thread>
+#include <memory>
 #include <z3++.h>
 #include "ExprToBDDTransformer.h"
 #include "Config.h"
+#include "FBSLogger.h"
 
 z3::expr Translate(z3::expr e, z3::context& ctx);
+std::vector<z3::expr> Translate(const std::vector<z3::expr>& es, z3::context& ctx);
+z3::expr_vector GetQuantBoundVars(z3::expr e);
 
 class SimplifierThread
 {
 public:
     SimplifierThread(SimplifierThread&&) = default;
-    SimplifierThread(z3::expr e, bool over) : overapproximate(over), expr(Translate(e, ctx)), result(ctx.bool_val(over)), transformer(expr.ctx(), expr, Config()), thread([this] { Run(); }) {}
+    SimplifierThread(z3::expr e, bool over, const std::vector<z3::expr>& bnd) : overapproximate(over), expr(Translate(e, ctx)), pre_bound(Translate(bnd, ctx)), thread([this] { Run(); }) 
+    {
+    }
 
     void Run();
+    void RunApprox();
 
-    void RunOver();
-    void RunUnder();
+    void WaitForResult() { thread.join(); }
 
-    z3::expr WaitForResult() { thread.join(); return result; }
+    bool IsFinished() const { return finished; }
 
     z3::expr BDDToFormula(DdNode* node);
     z3::expr BDDToFormula(const BDD& bdd);
 
-    void CollectVars(z3::expr e);
+    z3::expr CollectVars(z3::expr e, int n_bound);
 
-    z3::expr GetResult() const { return result; }
+    const std::vector<z3::expr>& GetResult() const { return result; }
 
     z3::expr FixUnder(z3::expr e, int bw);
 
@@ -33,9 +39,11 @@ private:
     bool overapproximate;
     z3::context ctx;
     z3::expr expr;
-    z3::expr result;
+    std::vector<z3::expr> pre_bound;
+    std::vector<z3::expr> result;
+    bool finished = false;
 
-    ExprToBDDTransformer transformer;
+    std::unique_ptr<ExprToBDDTransformer> transformer;
     std::thread thread;
 
     int nodes = 0;
