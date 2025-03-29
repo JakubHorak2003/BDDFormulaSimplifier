@@ -32,7 +32,6 @@ z3::expr FormulaSimplifier::Run()
     std::vector<z3::expr> bound;
     LaunchThreads(expr, bound);
     assert(bound.empty());
-    threads.emplace_back(expr, true, bound);
     threads.emplace_back(expr, false, bound);
     logger.Log(std::to_string(threads.size()) + " threads launched");
 
@@ -46,19 +45,13 @@ z3::expr FormulaSimplifier::Run()
     auto t_curr = threads.begin();
     expr = Simplify(expr, t_curr);
 
-    auto& to = *t_curr++;
     auto& tu = *t_curr++;
     logger.Log("Getting result from main thread");
-    auto over = Translate(to.GetResult(), expr.ctx());
     auto under = Translate(tu.GetResult(), expr.ctx());
     if (!under.empty())
     {
         logger.Log("Solved using under on the whole formula");
         expr = expr.ctx().bool_val(true);
-    }
-    else
-    {
-        expr = decorateFormula(expr, simplifyOr(expr.ctx(), PickResults(under)), simplifyAnd(expr.ctx(), PickResults(over)));
     }
 
     logger.DumpFormula("out.smt2", expr);

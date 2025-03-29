@@ -47,7 +47,7 @@ find "$BENCHMARK_FOLDER" -type f -name "*.smt2" | while read -r FILE; do
 
     rm out.smt2
     cp "$FILE" out.smt2
-    timeout "$HALF_TIMEOUT" ../build/myapp --timeout:5 --verbose:1 "$FILE"
+    timeout "$HALF_TIMEOUT" ../build/myapp --timeout:$(($HALF_TIMEOUT - 3)) --verbose:1 "$FILE"
     MYAPP_EXIT=$?
     if [ $MYAPP_EXIT -gt 0 ] && [ $MYAPP_EXIT -ne 124 ]; then
         MYAPP_Z3_RESULT="crash"
