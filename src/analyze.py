@@ -20,6 +20,7 @@ def main():
     conflicts_benchmarks = []
 
     tool_names = ["z3", "q3b", "cvc5", "myapp then z3", "myapp then cvc5"]
+    #tool_names = ["z3", "q3b", "myapp then z3"]
     tool_solved_counts = defaultdict(int)
     
     try:

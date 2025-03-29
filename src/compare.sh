@@ -13,7 +13,7 @@ RESULTS_FILE="results.txt"
 find "$BENCHMARK_FOLDER" -type f -name "*.smt2" | while read -r FILE; do
     echo "Processing benchmark: $FILE"
 
-    Z3_OUTPUT=$(timeout "$TIMEOUT_VAL" z3 "$FILE" 2>&1)
+    Z3_OUTPUT=$(timeout "$TIMEOUT_VAL" taskset -c 0-2 z3 "$FILE" 2>&1)
     Z3_EXIT=$?
     if [ $Z3_EXIT -eq 124 ]; then
         Z3_RESULT="timeout"
@@ -23,7 +23,7 @@ find "$BENCHMARK_FOLDER" -type f -name "*.smt2" | while read -r FILE; do
         Z3_RESULT=$(echo "$Z3_OUTPUT" | tail -n 1)
     fi
 
-    Q3B_OUTPUT=$(timeout "$TIMEOUT_VAL" ../build/external/q3b/q3b "$FILE" 2>&1)
+    Q3B_OUTPUT=$(timeout "$TIMEOUT_VAL" taskset -c 0-2 ../build/external/q3b/q3b "$FILE" 2>&1)
     Q3B_EXIT=$?
     if [ $Q3B_EXIT -eq 124 ]; then
         Q3B_RESULT="timeout"
@@ -33,7 +33,7 @@ find "$BENCHMARK_FOLDER" -type f -name "*.smt2" | while read -r FILE; do
         Q3B_RESULT=$(echo "$Q3B_OUTPUT" | tail -n 1)
     fi
 
-    CVC5_OUTPUT=$(timeout "$TIMEOUT_VAL" ~/cvc5/cvc5/build/bin/cvc5 "$FILE" 2>&1)
+    CVC5_OUTPUT=$(timeout "$TIMEOUT_VAL" taskset -c 0-2 ~/cvc5/cvc5/build/bin/cvc5 "$FILE" 2>&1)
     CVC5_EXIT=$?
     if [ $CVC5_EXIT -eq 124 ]; then
         CVC5_RESULT="timeout"
@@ -47,13 +47,15 @@ find "$BENCHMARK_FOLDER" -type f -name "*.smt2" | while read -r FILE; do
 
     rm out.smt2
     cp "$FILE" out.smt2
-    timeout "$HALF_TIMEOUT" ../build/myapp --timeout:$(($HALF_TIMEOUT - 3)) --verbose:1 "$FILE"
+    MYAPP_OUTPUT=$(timeout "$HALF_TIMEOUT" taskset -c 0-2 ../build/myapp --timeout:$(($HALF_TIMEOUT - 3)) --verbose:1 "$FILE" 2>&1)
+    echo "$FILE" >> "log.txt"
+    echo "$MYAPP_OUTPUT" >> "log.txt"
     MYAPP_EXIT=$?
     if [ $MYAPP_EXIT -gt 0 ] && [ $MYAPP_EXIT -ne 124 ]; then
         MYAPP_Z3_RESULT="crash"
         MYAPP_CVC5_RESULT="crash"
     else
-        MYAPP_Z3_OUTPUT=$(timeout "$HALF_TIMEOUT" z3 out.smt2 2>&1)
+        MYAPP_Z3_OUTPUT=$(timeout "$HALF_TIMEOUT" taskset -c 0-2 z3 out.smt2 2>&1)
         MYAPP_Z3_EXIT=$?
         if [ $MYAPP_Z3_EXIT -eq 124 ]; then
             MYAPP_Z3_RESULT="timeout"
@@ -63,7 +65,7 @@ find "$BENCHMARK_FOLDER" -type f -name "*.smt2" | while read -r FILE; do
             MYAPP_Z3_RESULT=$(echo "$MYAPP_Z3_OUTPUT" | tail -n 1)
         fi
 
-        MYAPP_CVC5_OUTPUT=$(timeout "$HALF_TIMEOUT" ~/cvc5/cvc5/build/bin/cvc5 out.smt2 2>&1)
+        MYAPP_CVC5_OUTPUT=$(timeout "$HALF_TIMEOUT" taskset -c 0-2 ~/cvc5/cvc5/build/bin/cvc5 out.smt2 2>&1)
         MYAPP_CVC5_EXIT=$?
         if [ $MYAPP_CVC5_EXIT -eq 124 ]; then
             MYAPP_CVC5_RESULT="timeout"

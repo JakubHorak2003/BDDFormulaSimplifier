@@ -46,6 +46,7 @@ z3::expr FormulaSimplifier::Run()
     expr = Simplify(expr, t_curr);
 
     auto& tu = *t_curr++;
+    assert(t_curr == threads.end());
     logger.Log("Getting result from main thread");
     auto under = Translate(tu.GetResult(), expr.ctx());
     if (!under.empty())
@@ -99,8 +100,7 @@ z3::expr FormulaSimplifier::Simplify(z3::expr e, std::list<SimplifierThread>::it
             e = f(sim.size(), &sim[0]);
         }
     }
-
-    if (e.is_quantifier())
+    else if (e.is_quantifier())
     {
         auto bound = GetQuantBoundVars(e);
 

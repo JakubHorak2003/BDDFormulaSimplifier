@@ -46,7 +46,6 @@ void SimplifierThread::Run()
     expr = CollectVars(expr, 0);
 
     logger.Log("Creating transformer...");
-    logger.DumpFormula("h.smt2", expr);
     transformer = std::make_unique<ExprToBDDTransformer>(expr.ctx(), expr, Config());
 
     logger.Log("Running approximations...");
@@ -92,7 +91,9 @@ void SimplifierThread::RunApprox()
         {
             logger.Log("Bdd always true");
             result.clear();
-            result.push_back(FixUnder(expr.ctx().bool_val(true), bw));
+            auto cand = FixUnder(expr.ctx().bool_val(true), bw);
+            assert(!isFalse(cand));
+            result.push_back(cand);
             return;
         }
 
@@ -111,6 +112,7 @@ void SimplifierThread::RunApprox()
                 result.pop_back();
             }
             node_counts.push_back(nc);
+            assert(!isFalse(cand) && !isTrue(cand));
             result.push_back(cand);
         }
 
@@ -186,7 +188,6 @@ z3::expr SimplifierThread::CollectVars(z3::expr e, int n_bound)
         {
             auto res = pre_bound[pre_bound.size() + n_bound - idx - 1];
             vars.emplace(res.to_string(), res);
-            std::cout << "Pre bound subst: idx = " << idx << ", var = " << res << '\n';
             return res;
         }
         return e;
