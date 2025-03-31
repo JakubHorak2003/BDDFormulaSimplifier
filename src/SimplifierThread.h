@@ -49,6 +49,8 @@ private:
     int nodes = 0;
 
     std::map<std::string, z3::expr> vars;
-    std::map<const DdNode*, z3::expr> expr_cache;
+    std::map<const DdNode*, z3::expr> expr_cache_exact;
+    std::map<const DdNode*, z3::expr> expr_cache_over;
+    std::map<const DdNode*, z3::expr> expr_cache_under;
     std::map<int, std::pair<std::string, int>> idx_to_var;
 };

@@ -43,7 +43,13 @@ z3::expr FormulaSimplifier::Run()
         logger.Log("Timeout");
 
     auto t_curr = threads.begin();
-    expr = Simplify(expr, t_curr);
+    auto res = Simplify(expr, t_curr, true, true);
+
+    t_curr = threads.begin();
+    auto expr_o = Simplify(expr, t_curr, true, false);
+    t_curr = threads.begin();
+    auto expr_u = Simplify(expr, t_curr, false, true);
+
 
     auto& tu = *t_curr++;
     assert(t_curr == threads.end());
@@ -52,16 +58,18 @@ z3::expr FormulaSimplifier::Run()
     if (!under.empty())
     {
         logger.Log("Solved using under on the whole formula");
-        expr = expr.ctx().bool_val(true);
+        res = expr_u = expr_o = expr.ctx().bool_val(true);
     }
 
-    logger.DumpFormula("out.smt2", expr);
+    logger.DumpFormula("out.smt2", res);
+    logger.DumpFormula("out_o.smt2", expr_o);
+    logger.DumpFormula("out_u.smt2", expr_u);
     for (auto& t : threads)
         t.WaitForResult();
-    return expr;
+    return res;
 }
 
-z3::expr FormulaSimplifier::Simplify(z3::expr e, std::list<SimplifierThread>::iterator& t_curr)
+z3::expr FormulaSimplifier::Simplify(z3::expr e, std::list<SimplifierThread>::iterator& t_curr, bool use_over, bool use_under)
 {
     if (e.is_const() || !e.is_bool())
     {
@@ -75,9 +83,12 @@ z3::expr FormulaSimplifier::Simplify(z3::expr e, std::list<SimplifierThread>::it
 
         auto decl_kind = f.decl_kind();
 
+        bool uo = decl_kind == Z3_OP_NOT ? use_under : use_over;
+        bool uu = decl_kind == Z3_OP_NOT ? use_over : use_under;
+
         std::vector<z3::expr> sim;
         for (unsigned i = 0; i < num; ++i)
-            sim.push_back(Simplify(e.arg(i), t_curr));
+            sim.push_back(Simplify(e.arg(i), t_curr, uo, uu));
 
         if (decl_kind == Z3_OP_NOT)
         {
@@ -105,16 +116,19 @@ z3::expr FormulaSimplifier::Simplify(z3::expr e, std::list<SimplifierThread>::it
         auto bound = GetQuantBoundVars(e);
 
         if (e.is_forall())
-            e = z3::forall(bound, Simplify(e.body(), t_curr));
+            e = z3::forall(bound, Simplify(e.body(), t_curr, use_over, use_under));
         else
-            e = z3::exists(bound, Simplify(e.body(), t_curr));
+            e = z3::exists(bound, Simplify(e.body(), t_curr, use_over, use_under));
 
         auto& to = *t_curr++;
         auto& tu = *t_curr++;
         logger.Log("Getting result from thread");
         auto over = Translate(to.GetResult(), e.ctx());
         auto under = Translate(tu.GetResult(), e.ctx());
-        e = decorateFormula(e, simplifyOr(e.ctx(), PickResults(under)), simplifyAnd(e.ctx(), PickResults(over)));
+        if (use_under)
+            e = simplifyOr(e.ctx(), {simplifyOr(e.ctx(), PickResults(under)), e});
+        if (use_over)
+            e = simplifyAnd(e.ctx(), {simplifyAnd(e.ctx(), PickResults(over)), e});
     }
 
     return e;
@@ -173,6 +187,10 @@ z3::expr FormulaSimplifier::RemoveInternal(z3::expr e)
             return z3::udiv(sim[0], sim[1]);
         if (decl_kind == Z3_OP_BUREM_I)
             return z3::urem(sim[0], sim[1]);
+
+        if (decl_kind == Z3_OP_IMPLIES)
+            return !sim[0] || sim[1];
+
 
         return f(sim);
     }

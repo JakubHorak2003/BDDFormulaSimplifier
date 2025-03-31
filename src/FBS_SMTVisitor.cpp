@@ -313,7 +313,7 @@ antlrcpp::Any FBS_SMTVisitor::visitCommand(SMTLIBv2Parser::CommandContext* comma
             for (const auto& x : assert)
                 ev.push_back(x);
         }
-        auto expr = z3::mk_and(ev);
+        auto expr = ev.size() == 1 ? ev[0] : z3::mk_and(ev);
         logger.DumpFormula("in.smt2", expr);
         logger.DumpFormula("out.smt2", expr);
         

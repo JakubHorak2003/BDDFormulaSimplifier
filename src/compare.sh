@@ -8,74 +8,74 @@ BENCHMARK_FOLDER="$1"
 TIMEOUT_VAL="$2"
 RESULTS_FILE="results.txt"
 
+MYAPP_CMD="../build/myapp"
+Z3_CMD="z3"
+Q3B_CMD="../build/external/q3b/q3b"
+CVC5_CMD="/home/kouba/cvc5/cvc5/build/bin/cvc5"
+BITW_CMD="bitwuzla"
+
 > "$RESULTS_FILE"
 
-find "$BENCHMARK_FOLDER" -type f -name "*.smt2" | while read -r FILE; do
+run_tool() {
+    local timeout_val="$1"
+    shift
+    local output
+    output=$(timeout "$timeout_val" "$@" 2>&1)
+    local exit_code=$?
+    if [ $exit_code -eq 124 ]; then
+        echo "timeout"
+    elif [ $exit_code -gt 0 ]; then
+        echo "crash"
+    else
+        echo "$output" | tail -n 1
+    fi
+}
+
+evaluate_mytool() {
+    local file="$1"
+    local total_timeout="$2"
+    local half_timeout=$(( total_timeout / 2 ))
+
+    rm out.smt2 out_o.smt2 out_u.smt2
+    cp "$file" out.smt2
+    cp "$file" out_o.smt2
+    cp "$file" out_u.smt2
+    local output
+    output=$(timeout "$half_timeout" "$MYAPP_CMD" --verbose:1 --timeout:$((half_timeout - 1)) "$file" 2>&1)
+    local exit_code=$?
+    echo "$file" >> log.txt
+    echo "$output" >> log.txt
+    if [ $exit_code -eq 124 ]; then
+        echo "myapp_timeout"
+    elif [ $exit_code -gt 0 ]; then
+        echo "myapp_crash"
+    else
+        echo "succ"
+    fi
+}
+
+
+cat "$BENCHMARK_FOLDER" | while read -r FILE; do
     echo "Processing benchmark: $FILE"
 
-    Z3_OUTPUT=$(timeout "$TIMEOUT_VAL" taskset -c 0-2 z3 "$FILE" 2>&1)
-    Z3_EXIT=$?
-    if [ $Z3_EXIT -eq 124 ]; then
-        Z3_RESULT="timeout"
-    elif [ $Z3_EXIT -gt 0 ]; then
-        Z3_RESULT="crash"
-    else
-        Z3_RESULT=$(echo "$Z3_OUTPUT" | tail -n 1)
-    fi
+    Z3_RESULT=$(run_tool "$TIMEOUT_VAL" "$Z3_CMD" "$FILE")
+    Q3B_RESULT=$(run_tool "$TIMEOUT_VAL" "$Q3B_CMD" "$FILE")
+    CVC5_RESULT=$(run_tool "$TIMEOUT_VAL" "$CVC5_CMD" "$FILE")
+    BITW_RESULT=$(run_tool "$TIMEOUT_VAL" "$BITW_CMD" "$FILE")
 
-    Q3B_OUTPUT=$(timeout "$TIMEOUT_VAL" taskset -c 0-2 ../build/external/q3b/q3b "$FILE" 2>&1)
-    Q3B_EXIT=$?
-    if [ $Q3B_EXIT -eq 124 ]; then
-        Q3B_RESULT="timeout"
-    elif [ $Q3B_EXIT -gt 0 ]; then
-        Q3B_RESULT="crash"
-    else
-        Q3B_RESULT=$(echo "$Q3B_OUTPUT" | tail -n 1)
-    fi
+    MY_TOOL_RESULT=$(evaluate_mytool "$FILE" "$TIMEOUT_VAL")
 
-    CVC5_OUTPUT=$(timeout "$TIMEOUT_VAL" taskset -c 0-2 ~/cvc5/cvc5/build/bin/cvc5 "$FILE" 2>&1)
-    CVC5_EXIT=$?
-    if [ $CVC5_EXIT -eq 124 ]; then
-        CVC5_RESULT="timeout"
-    elif [ $CVC5_EXIT -gt 0 ]; then
-        CVC5_RESULT="crash"
-    else
-        CVC5_RESULT=$(echo "$CVC5_OUTPUT" | tail -n 1)
-    fi
+    MYAPP_Z3_RESULT=$(run_tool "$TIMEOUT_VAL" "$Z3_CMD" "out.smt2")
+    MYAPP_CVC5_RESULT=$(run_tool "$TIMEOUT_VAL" "$CVC5_CMD" "out.smt2")
+    MYAPP_BITW_RESULT=$(run_tool "$TIMEOUT_VAL" "$BITW_CMD" "out.smt2")
 
-    HALF_TIMEOUT=$(($TIMEOUT_VAL / 2))
+    MYAPP_O_Z3_RESULT=$(run_tool "$TIMEOUT_VAL" "$Z3_CMD" "out_o.smt2")
+    MYAPP_O_CVC5_RESULT=$(run_tool "$TIMEOUT_VAL" "$CVC5_CMD" "out_o.smt2")
+    MYAPP_O_BITW_RESULT=$(run_tool "$TIMEOUT_VAL" "$BITW_CMD" "out_o.smt2")
 
-    rm out.smt2
-    cp "$FILE" out.smt2
-    MYAPP_OUTPUT=$(timeout "$HALF_TIMEOUT" taskset -c 0-2 ../build/myapp --timeout:$(($HALF_TIMEOUT - 3)) --verbose:1 "$FILE" 2>&1)
-    echo "$FILE" >> "log.txt"
-    echo "$MYAPP_OUTPUT" >> "log.txt"
-    MYAPP_EXIT=$?
-    if [ $MYAPP_EXIT -gt 0 ] && [ $MYAPP_EXIT -ne 124 ]; then
-        MYAPP_Z3_RESULT="crash"
-        MYAPP_CVC5_RESULT="crash"
-    else
-        MYAPP_Z3_OUTPUT=$(timeout "$HALF_TIMEOUT" taskset -c 0-2 z3 out.smt2 2>&1)
-        MYAPP_Z3_EXIT=$?
-        if [ $MYAPP_Z3_EXIT -eq 124 ]; then
-            MYAPP_Z3_RESULT="timeout"
-        elif [ $MYAPP_Z3_EXIT -gt 0 ]; then
-            MYAPP_Z3_RESULT="crash2"
-        else
-            MYAPP_Z3_RESULT=$(echo "$MYAPP_Z3_OUTPUT" | tail -n 1)
-        fi
+    MYAPP_U_Z3_RESULT=$(run_tool "$TIMEOUT_VAL" "$Z3_CMD" "out_u.smt2")
+    MYAPP_U_CVC5_RESULT=$(run_tool "$TIMEOUT_VAL" "$CVC5_CMD" "out_u.smt2")
+    MYAPP_U_BITW_RESULT=$(run_tool "$TIMEOUT_VAL" "$BITW_CMD" "out_u.smt2")
 
-        MYAPP_CVC5_OUTPUT=$(timeout "$HALF_TIMEOUT" taskset -c 0-2 ~/cvc5/cvc5/build/bin/cvc5 out.smt2 2>&1)
-        MYAPP_CVC5_EXIT=$?
-        if [ $MYAPP_CVC5_EXIT -eq 124 ]; then
-            MYAPP_CVC5_RESULT="timeout"
-        elif [ $MYAPP_CVC5_EXIT -gt 0 ]; then
-            MYAPP_CVC5_RESULT="crash2"
-        else
-            MYAPP_CVC5_RESULT=$(echo "$MYAPP_CVC5_OUTPUT" | tail -n 1)
-        fi
-    fi
-
-    echo "$FILE, $Z3_RESULT, $Q3B_RESULT, $CVC5_RESULT, $MYAPP_Z3_RESULT, $MYAPP_CVC5_RESULT" >> "$RESULTS_FILE"
-    echo "$Z3_RESULT, $Q3B_RESULT, $CVC5_RESULT, $MYAPP_Z3_RESULT, $MYAPP_CVC5_RESULT"
+    echo "$FILE, $Q3B_RESULT, $MY_TOOL_RESULT, $Z3_RESULT, $CVC5_RESULT, $BITW_RESULT, $MYAPP_Z3_RESULT, $MYAPP_CVC5_RESULT, $MYAPP_BITW_RESULT, $MYAPP_O_Z3_RESULT, $MYAPP_O_CVC5_RESULT, $MYAPP_O_BITW_RESULT, $MYAPP_U_Z3_RESULT, $MYAPP_U_CVC5_RESULT, $MYAPP_U_BITW_RESULT" >> "$RESULTS_FILE"
 done

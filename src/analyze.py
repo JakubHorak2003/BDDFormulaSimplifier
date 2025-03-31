@@ -4,91 +4,114 @@ import sys
 from collections import defaultdict
 
 def is_solved(result):
-    return result.lower() in {"sat", "unsat"}
+    return result == 'sat' or result == 'unsat'
+
+SECONDARY_TOOLS = ['z3', 'cvc5', 'bitw']
+
+def print_stats(data):
+    total = data['total']
+    for tool, cnt in sorted(data.items(), key=lambda x:-x[1]):
+        print(f'    {tool}: {cnt} ({cnt/total*100:.2f} %)')
+
+def combine_results(results):
+    results = set(results)
+    if {'sat', 'unsat'} <= results:
+        return 'crash'
+    if 'sat' in results:
+        return 'sat'
+    if 'unsat' in results:
+        return 'unsat'
+    if 'crash' in results:
+        return 'crash'
+    return 'timeout'
+
+def add_tool(dct, subtools):
+    name = '||'.join(subtools)
+    result = combine_results([dct[t] for t in subtools])
+    dct[name] = result
+
+def augment_tools(dct):
+    add_tool(dct, [t for t in dct if 'myapp' in t])
+    add_tool(dct, [t for t in dct if 'myapp' not in t and t != 'q3b'])
+    return
+    tools = list(dct.keys())
+    for tool_over in tools:
+        for tool_under in tools:
+            if tool_over >= tool_under:
+                continue
+            
+            name = f'{tool_over}||{tool_under}'
+            result = combine_results([dct[tool_over], dct[tool_under]])
+            dct[name] = result
+
+def load_old(filename):
+    with open(filename) as file:
+        lines = file.read().strip().split('\n')
+    res = {}
+    tool_names = ['z3', 'q3b', 'cvc5', 'myapp then z3', 'myapp then cvc5']
+    for line in lines:
+        benchmark, *results = [p.strip() for p in line.split(',')]
+        for t, r in zip(tool_names, results):
+            res[benchmark, t] = r
+    return res
 
 def main():
     if len(sys.argv) < 2:
-        filename = "results.txt"
+        filename = 'results.txt'
     else:
         filename = sys.argv[1]
-    
-    total_benchmarks = 0
-    solved_by_all = 0
-    solved_by_none = 0
-    solved_by_one_counts = defaultdict(int)
-    conflicts = 0
-    conflicts_benchmarks = []
 
-    tool_names = ["z3", "q3b", "cvc5", "myapp then z3", "myapp then cvc5"]
-    #tool_names = ["z3", "q3b", "myapp then z3"]
-    tool_solved_counts = defaultdict(int)
-    
-    try:
-        with open(filename, "r") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue 
+    old = load_old('results_v4.txt')
 
-                parts = [part.strip() for part in line.split(",")]
-                if len(parts) != len(tool_names) + 1:
-                    print(f"Skipping line with unexpected format: {line}")
-                    continue
+    with open(filename) as file:
+        lines = file.read().strip().split('\n')
 
-                benchmark, *results = parts
-                total_benchmarks += 1
+    tool_names = SECONDARY_TOOLS + ['myapp+' + t for t in SECONDARY_TOOLS] + ['myapp_over+' + t for t in SECONDARY_TOOLS] + ['myapp_under+' + t for t in SECONDARY_TOOLS]
 
-                results = {
-                    tool: res for tool, res in zip(tool_names, results)
-                }
-                solved_tools = {tool: res.lower() for tool, res in results.items() if is_solved(res)}
-                
-                # Count each tool's solved benchmarks
-                for tool in solved_tools:
-                    tool_solved_counts[tool] += 1
+    total_perf = defaultdict(int)
+    sat_perf = defaultdict(int)
+    unsat_perf = defaultdict(int)
 
-                count_solved = len(solved_tools)
-                if count_solved == 0:
-                    solved_by_none += 1
-                if count_solved == 3:
-                    solved_by_all += 1
-                if count_solved == 1:
-                    # Only one tool solved it; record which one
-                    only_tool = next(iter(solved_tools.keys()))
-                    solved_by_one_counts[only_tool] += 1
+    myapp_only = 0
 
-                # Detect conflicts: if at least two tools solved it but with differing results.
-                if count_solved >= 2:
-                    # Create a set of solved results (e.g., {"sat"} or {"sat", "unsat"})
-                    solved_results = set(solved_tools.values())
-                    if len(solved_results) > 1:
-                        conflicts += 1
-                        conflicts_benchmarks.append(benchmark)
-    except FileNotFoundError:
-        print(f"Results file '{filename}' not found.")
-        sys.exit(1)
+    for line in lines:
+        benchmark, q3b_res, myapp_res, *results = [p.strip() for p in line.split(',')]
 
-    def pct(count):
-        return (count / total_benchmarks * 100) if total_benchmarks else 0
+        results_dct = {t:r for t, r in zip(tool_names, results)}
+        results_dct['q3b'] = q3b_res
 
-    # Print the analysis
-    print(f"Total benchmarks analyzed: {total_benchmarks}\n")
-    print(f"Benchmarks solved by all tools: {solved_by_all} ({pct(solved_by_all):.2f}%)")
-    print(f"Benchmarks not solved by any tool: {solved_by_none} ({pct(solved_by_none):.2f}%)\n")
-    print("Benchmarks solved by only one tool:")
-    for tool in tool_names:
-        count = solved_by_one_counts[tool]
-        print(f"  {tool}: {count} ({pct(count):.2f}%)")
-    print()
-    print(f"Benchmarks with conflicting results (sat vs unsat): {conflicts} ({pct(conflicts):.2f}%)")
-    if conflicts_benchmarks:
-        print("List of benchmarks with conflicts:")
-        for bench in conflicts_benchmarks:
-            print(f"  {bench}")
-    print("\nIndividual tool performance:")
-    for tool in tool_names:
-        count = tool_solved_counts[tool]
-        print(f"  {tool} solved {count} benchmarks ({pct(count):.2f}%)")
+        augment_tools(results_dct)
+
+        all_res = set(results_dct.values())
+        if {'sat', 'unsat'} <= all_res:
+            print('Conflict found', benchmark)
+            continue
+
+        if results_dct['myapp+cvc5'] != old[benchmark, 'myapp then cvc5']:
+            print('Different result', results_dct['myapp+cvc5'], old[benchmark, 'myapp then cvc5'], benchmark)
+        
+        bench_res = 'sat' if 'sat' in all_res else 'unsat' if 'unsat' in all_res else 'unknown'
+        solved_tools = [t for t, r in results_dct.items() if r == bench_res]
+        by_res_perf = sat_perf if bench_res == 'sat' else unsat_perf
+        for t in solved_tools:
+            total_perf[t] += 1
+            by_res_perf[t] += 1
+        total_perf['total'] += 1
+        by_res_perf['total'] += 1
+
+        if solved_tools and all('myapp' in t for t in solved_tools):
+            myapp_only += 1
+
+    print('Total:')
+    print_stats(total_perf)
+
+    print('Sat:')
+    print_stats(sat_perf)
+
+    print('Unsat:')
+    print_stats(unsat_perf)
+
+    print('My app only:', myapp_only)
 
 if __name__ == "__main__":
     main()

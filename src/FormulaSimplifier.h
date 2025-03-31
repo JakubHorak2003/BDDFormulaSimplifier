@@ -12,7 +12,7 @@ public:
 
     z3::expr Run();
 
-    z3::expr Simplify(z3::expr e, std::list<SimplifierThread>::iterator& t_curr);
+    z3::expr Simplify(z3::expr e, std::list<SimplifierThread>::iterator& t_curr, bool use_over, bool use_under);
 
     void LaunchThreads(z3::expr e, std::vector<z3::expr>& bound);
 
