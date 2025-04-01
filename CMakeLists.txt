@@ -41,7 +41,7 @@ target_include_directories(q3b_includes INTERFACE
 )
 
 # Now add your own executable target.
-add_executable(myapp src/main.cpp src/FBS_SMTVisitor.cpp src/FormulaSimplifier.cpp src/FBSLogger.cpp src/SimplifierThread.cpp src/SimplifierBasic.cpp src/TimeoutManager.cpp)
+add_executable(myapp src/main.cpp src/FBS_SMTVisitor.cpp src/FormulaSimplifier.cpp src/FBSLogger.cpp src/SimplifierThread.cpp src/SimplifierBasic.cpp src/TimeoutManager.cpp src/Settings.cpp)
 
 # Link your executable with both the Q3B library and the interface target carrying include directories.
 target_link_libraries(myapp PRIVATE q3blib q3b_includes)

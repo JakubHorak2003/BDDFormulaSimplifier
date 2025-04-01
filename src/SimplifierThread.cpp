@@ -42,13 +42,10 @@ z3::expr_vector GetQuantBoundVars(z3::expr e)
 
 void SimplifierThread::Run()
 {
-    logger.Log("Collecting vars...");
     expr = CollectVars(expr, 0);
 
-    logger.Log("Creating transformer...");
     transformer = std::make_unique<ExprToBDDTransformer>(expr.ctx(), expr, Config());
 
-    logger.Log("Running approximations...");
     RunApprox();
 
     finished = true;
@@ -61,6 +58,8 @@ void SimplifierThread::RunApprox()
         
     if (!overapproximate)
         transformer->setApproximationType(ZERO_EXTEND);
+
+    std::string approx_str = overapproximate ? "over" : "under";
 
     int bw = 1;
     int prec = 1;
@@ -78,7 +77,7 @@ void SimplifierThread::RunApprox()
         if (Solver::resultComputed)
             return;
         const auto& bdd = overapproximate ? bdds.upper : bdds.lower;
-        //logger.DumpFormulaBDD(expr, bdd.upper);
+        // logger.DumpFormulaBDD(expr, bdd.upper);
 
         if (overapproximate && bdd.IsZero())
         {
@@ -100,8 +99,10 @@ void SimplifierThread::RunApprox()
         int nc = bdd.nodeCount();
         if (nc != node_counts.back() && !bdd.IsZero() && !bdd.IsOne())
         {
-            logger.Log("Useful result returned (" + std::to_string(bdd.nodeCount()) + " nodes)");
+            logger.Log("Useful result returned (" + std::to_string(bdd.nodeCount()) + " nodes) " + approx_str + " " + std::to_string(bw) + " " + std::to_string(prec));
             auto cand = BDDToFormula(bdd);
+            // auto cand = BDDToFormulaApprox(bdd, 5);
+            // logger.DumpFormulaBDD(cand, bdd);
             if (!overapproximate)
                 cand = FixUnder(cand, bw);
             if (Solver::resultComputed)
@@ -176,6 +177,70 @@ z3::expr SimplifierThread::BDDToFormula(const BDD& bdd)
     return ne;
 }
 
+ApproxExpr SimplifierThread::BDDToFormulaApprox(DdNode *node, std::size_t max_size)
+{
+    if (approx_expr_cache.find(node) != approx_expr_cache.end())
+        return approx_expr_cache.at(node);
+
+    const auto& texpr = BDDToFormulaApprox(Cudd_Regular(Cudd_T(node)), max_size);
+    if (Solver::resultComputed)
+        return ApproxExpr(expr.ctx());
+    const auto& fexpr = BDDToFormulaApprox(Cudd_Regular(Cudd_E(node)), max_size);
+    if (Solver::resultComputed)
+        return ApproxExpr(expr.ctx());
+
+    auto fpo = Cudd_IsComplement(Cudd_E(node)) ? fexpr.pths_zero : fexpr.pths_one;
+    auto fpz = Cudd_IsComplement(Cudd_E(node)) ? fexpr.pths_one : fexpr.pths_zero;
+    auto tpo = texpr.pths_one;
+    auto tpz = texpr.pths_zero;
+
+    int idx = Cudd_NodeReadIndex(node);
+    const auto&[name, bit] = idx_to_var.at(idx);
+    z3::expr var = vars.at(name).is_bool() ? vars.at(name) : vars.at(name).extract(bit, bit) == expr.ctx().bv_val(1, 1);
+    z3::expr neg = vars.at(name).is_bool() ? !vars.at(name) : vars.at(name).extract(bit, bit) == expr.ctx().bv_val(0, 1);
+
+    ApproxExpr result(expr.ctx());
+    tpo.AddConstraint(var);
+    tpz.AddConstraint(var);
+    fpo.AddConstraint(neg);
+    fpz.AddConstraint(neg);
+    result.pths_one = tpo.MergeWith(fpo, max_size);
+    result.pths_zero = tpz.MergeWith(fpz, max_size);
+    approx_expr_cache.emplace(node, result);
+    return result;
+}
+
+z3::expr SimplifierThread::BDDToFormulaApprox(const BDD &bdd, std::size_t max_size)
+{
+    approx_expr_cache.clear();
+    idx_to_var.clear();
+    for (const auto&[name, bvec] : transformer->vars)
+    {
+        for (int i = 0; i < bvec.bitnum(); ++i)
+        {
+            int idx = bvec[i].GetBDD().NodeReadIndex();
+            idx_to_var[idx] = std::make_pair(name, i);
+        }
+    }
+    ApproxExpr false_expr(expr.ctx());
+    ApproxExpr true_expr(expr.ctx());
+    false_expr.pths_zero.clauses.emplace_back();
+    true_expr.pths_one.clauses.emplace_back();
+    approx_expr_cache.emplace(Cudd_ReadOne(bdd.manager()), true_expr);
+    approx_expr_cache.emplace(Cudd_ReadZero(bdd.manager()), false_expr);
+
+    const auto& ne = BDDToFormulaApprox(bdd.getRegularNode(), max_size);
+    if (Solver::resultComputed)
+        return expr.ctx().bool_val(false);
+
+    const auto& po = Cudd_IsComplement(bdd.getNode()) ? ne.pths_zero : ne.pths_one;
+    const auto& pz = Cudd_IsComplement(bdd.getNode()) ? ne.pths_one : ne.pths_zero;
+
+    if (overapproximate)
+        return !pz.ToFormula();
+    return po.ToFormula();
+}
+
 z3::expr SimplifierThread::CollectVars(z3::expr e, int n_bound)
 {
     if (Solver::resultComputed)
@@ -241,4 +306,28 @@ z3::expr SimplifierThread::FixUnder(z3::expr e, int bw)
     }
     conj.push_back(e);
     return simplifyAnd(e.ctx(), conj);
+}
+
+z3::expr ApproxDNF::ToFormula() const
+{
+    std::vector<z3::expr> clause_formulas;
+    for (const auto& c : clauses)
+        clause_formulas.push_back(simplifyAnd(*ctx, c));
+    return simplifyOr(*ctx, clause_formulas);
+}
+
+void ApproxDNF::AddConstraint(z3::expr e)
+{
+    for (auto& c : clauses)
+        c.push_back(e);
+}
+
+ApproxDNF ApproxDNF::MergeWith(const ApproxDNF &other, std::size_t max_size)
+{
+    assert(ctx == other.ctx);
+    ApproxDNF res(*ctx);
+    std::merge(clauses.begin(), clauses.end(), other.clauses.begin(), other.clauses.end(), std::back_inserter(res.clauses), [&](const auto& a, const auto& b) { return a.size() < b.size(); });
+    if (res.clauses.size() > max_size)
+        res.clauses.resize(max_size);
+    return res;
 }

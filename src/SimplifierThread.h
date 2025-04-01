@@ -11,6 +11,28 @@ z3::expr Translate(z3::expr e, z3::context& ctx);
 std::vector<z3::expr> Translate(const std::vector<z3::expr>& es, z3::context& ctx);
 z3::expr_vector GetQuantBoundVars(z3::expr e);
 
+struct ApproxDNF
+{
+    ApproxDNF(z3::context& c) : ctx(&c) {}
+
+    z3::context* ctx;
+    std::vector<std::vector<z3::expr>> clauses;
+
+    z3::expr ToFormula() const;
+
+    void AddConstraint(z3::expr e);
+
+    ApproxDNF MergeWith(const ApproxDNF& other, std::size_t max_size);
+};
+
+struct ApproxExpr
+{
+    ApproxExpr(z3::context& c) : pths_one(c), pths_zero(c) {}
+
+    ApproxDNF pths_one;
+    ApproxDNF pths_zero;
+};
+
 class SimplifierThread
 {
 public:
@@ -28,6 +50,9 @@ public:
 
     z3::expr BDDToFormula(DdNode* node);
     z3::expr BDDToFormula(const BDD& bdd);
+
+    ApproxExpr BDDToFormulaApprox(DdNode* node, std::size_t max_size);
+    z3::expr BDDToFormulaApprox(const BDD& bdd, std::size_t max_size);
 
     z3::expr CollectVars(z3::expr e, int n_bound);
 
@@ -49,8 +74,7 @@ private:
     int nodes = 0;
 
     std::map<std::string, z3::expr> vars;
-    std::map<const DdNode*, z3::expr> expr_cache_exact;
-    std::map<const DdNode*, z3::expr> expr_cache_over;
-    std::map<const DdNode*, z3::expr> expr_cache_under;
+    std::map<const DdNode*, z3::expr> expr_cache;
+    std::map<const DdNode*, ApproxExpr> approx_expr_cache;
     std::map<int, std::pair<std::string, int>> idx_to_var;
 };

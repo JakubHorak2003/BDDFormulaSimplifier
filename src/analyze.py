@@ -100,6 +100,7 @@ def main():
         by_res_perf['total'] += 1
 
         if solved_tools and all('myapp' in t for t in solved_tools):
+            print('My app only', benchmark)
             myapp_only += 1
 
     print('Total:')

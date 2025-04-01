@@ -10,6 +10,7 @@
 #include "SimplifierBasic.h"
 #include "FBSLogger.h"
 #include "TimeoutManager.h"
+#include "Settings.h"
 
 #include "Config.h"
 #include "ExprToBDDTransformer.h"
@@ -18,10 +19,6 @@
 
 z3::expr FormulaSimplifier::Run()
 {
-    // SimplifierThread tr(expr, false);
-    // logger.DumpFormula("g.smt2", tr.WaitForResult());
-    // return expr;
-
     ExprSimplifier simplifier(expr.ctx(), true, true);
     logger.Log("Simplifying...");
     expr = simplifier.Simplify(expr);
@@ -45,11 +42,14 @@ z3::expr FormulaSimplifier::Run()
     auto t_curr = threads.begin();
     auto res = Simplify(expr, t_curr, true, true);
 
-    t_curr = threads.begin();
-    auto expr_o = Simplify(expr, t_curr, true, false);
-    t_curr = threads.begin();
-    auto expr_u = Simplify(expr, t_curr, false, true);
-
+    z3::expr expr_o(expr.ctx()), expr_u(expr.ctx());
+    if (settings.use_over && settings.use_under)
+    {
+        t_curr = threads.begin();
+        expr_o = Simplify(expr, t_curr, true, false);
+        t_curr = threads.begin();
+        expr_u = Simplify(expr, t_curr, false, true);
+    }
 
     auto& tu = *t_curr++;
     assert(t_curr == threads.end());
@@ -62,8 +62,11 @@ z3::expr FormulaSimplifier::Run()
     }
 
     logger.DumpFormula("out.smt2", res);
-    logger.DumpFormula("out_o.smt2", expr_o);
-    logger.DumpFormula("out_u.smt2", expr_u);
+    if (settings.use_over && settings.use_under)
+    {
+        logger.DumpFormula("out_o.smt2", expr_o);
+        logger.DumpFormula("out_u.smt2", expr_u);
+    }
     for (auto& t : threads)
         t.WaitForResult();
     return res;
@@ -120,15 +123,21 @@ z3::expr FormulaSimplifier::Simplify(z3::expr e, std::list<SimplifierThread>::it
         else
             e = z3::exists(bound, Simplify(e.body(), t_curr, use_over, use_under));
 
-        auto& to = *t_curr++;
-        auto& tu = *t_curr++;
         logger.Log("Getting result from thread");
-        auto over = Translate(to.GetResult(), e.ctx());
-        auto under = Translate(tu.GetResult(), e.ctx());
-        if (use_under)
-            e = simplifyOr(e.ctx(), {simplifyOr(e.ctx(), PickResults(under)), e});
-        if (use_over)
-            e = simplifyAnd(e.ctx(), {simplifyAnd(e.ctx(), PickResults(over)), e});
+        if (settings.use_under)
+        {
+            auto& tu = *t_curr++;
+            auto under = Translate(tu.GetResult(), e.ctx());
+            if (use_under)
+                e = simplifyOr(e.ctx(), {simplifyOr(e.ctx(), PickResults(under)), e});
+        }
+        if (settings.use_over)
+        {
+            auto& to = *t_curr++;
+            auto over = Translate(to.GetResult(), e.ctx());
+            if (use_over)
+                e = simplifyAnd(e.ctx(), {simplifyAnd(e.ctx(), PickResults(over)), e});
+        }
     }
 
     return e;
@@ -159,8 +168,10 @@ void FormulaSimplifier::LaunchThreads(z3::expr e, std::vector<z3::expr>& bound)
         while (bound.size() > curr_size)
             bound.pop_back();
 
-        threads.emplace_back(e, true, bound);
-        threads.emplace_back(e, false, bound);
+        if (settings.use_over)
+            threads.emplace_back(e, true, bound);
+        if (settings.use_under)
+            threads.emplace_back(e, false, bound);
     }
 }
 
