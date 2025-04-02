@@ -168,10 +168,10 @@ void FormulaSimplifier::LaunchThreads(z3::expr e, std::vector<z3::expr>& bound)
         while (bound.size() > curr_size)
             bound.pop_back();
 
-        if (settings.use_over)
-            threads.emplace_back(e, true, bound);
         if (settings.use_under)
             threads.emplace_back(e, false, bound);
+        if (settings.use_over)
+            threads.emplace_back(e, true, bound);
     }
 }
 

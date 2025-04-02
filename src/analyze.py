@@ -44,29 +44,22 @@ def augment_tools(dct):
             result = combine_results([dct[tool_over], dct[tool_under]])
             dct[name] = result
 
-def load_old(filename):
+def load(filename, tool_names, res):
     with open(filename) as file:
         lines = file.read().strip().split('\n')
-    res = {}
-    tool_names = ['z3', 'q3b', 'cvc5', 'myapp then z3', 'myapp then cvc5']
     for line in lines:
         benchmark, *results = [p.strip() for p in line.split(',')]
+        if benchmark not in res:
+            res[benchmark] = {}
         for t, r in zip(tool_names, results):
-            res[benchmark, t] = r
-    return res
+            if t != '':
+                res[benchmark][t] = r
 
 def main():
-    if len(sys.argv) < 2:
-        filename = 'results.txt'
-    else:
-        filename = sys.argv[1]
-
-    old = load_old('results_v4.txt')
-
-    with open(filename) as file:
-        lines = file.read().strip().split('\n')
-
-    tool_names = SECONDARY_TOOLS + ['myapp+' + t for t in SECONDARY_TOOLS] + ['myapp_over+' + t for t in SECONDARY_TOOLS] + ['myapp_under+' + t for t in SECONDARY_TOOLS]
+    data = {}
+    load('results_v5_fixaff_over.txt', ['', 'new_myapp_over+z3', 'new_myapp_over+cvc5', 'new_myapp_over+bitw'], data)
+    load('results_v5.txt', ['q3b', ''] + SECONDARY_TOOLS + ['myapp+' + t for t in SECONDARY_TOOLS] + ['myapp_over+' + t for t in SECONDARY_TOOLS] + ['myapp_under+' + t for t in SECONDARY_TOOLS], data)
+    load('results.txt', [''] + ['n2myapp+' + t for t in SECONDARY_TOOLS] + ['n2myapp_over+' + t for t in SECONDARY_TOOLS] + ['n2myapp_under+' + t for t in SECONDARY_TOOLS], data)
 
     total_perf = defaultdict(int)
     sat_perf = defaultdict(int)
@@ -74,21 +67,15 @@ def main():
 
     myapp_only = 0
 
-    for line in lines:
-        benchmark, q3b_res, myapp_res, *results = [p.strip() for p in line.split(',')]
-
-        results_dct = {t:r for t, r in zip(tool_names, results)}
-        results_dct['q3b'] = q3b_res
-
-        augment_tools(results_dct)
+    for benchmark, results_dct in data.items():
+        if 'n2myapp+z3' not in results_dct:
+            continue
+        # augment_tools(results_dct)
 
         all_res = set(results_dct.values())
         if {'sat', 'unsat'} <= all_res:
             print('Conflict found', benchmark)
             continue
-
-        if results_dct['myapp+cvc5'] != old[benchmark, 'myapp then cvc5']:
-            print('Different result', results_dct['myapp+cvc5'], old[benchmark, 'myapp then cvc5'], benchmark)
         
         bench_res = 'sat' if 'sat' in all_res else 'unsat' if 'unsat' in all_res else 'unknown'
         solved_tools = [t for t, r in results_dct.items() if r == bench_res]
@@ -99,9 +86,14 @@ def main():
         total_perf['total'] += 1
         by_res_perf['total'] += 1
 
-        if solved_tools and all('myapp' in t for t in solved_tools):
+        if solved_tools and all('new_myapp' in t for t in solved_tools) and any('new_myapp' in t for t in solved_tools):
             print('My app only', benchmark)
             myapp_only += 1
+
+        if 'myapp_over+bitw' in solved_tools and 'new_myapp_over+bitw' not in solved_tools:
+            print('WORSE', benchmark)
+        if 'myapp_over+bitw' not in solved_tools and 'new_myapp_over+bitw' in solved_tools:
+            print('BETTER', benchmark)
 
     print('Total:')
     print_stats(total_perf)
