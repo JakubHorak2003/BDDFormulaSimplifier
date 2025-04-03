@@ -15,6 +15,12 @@ Q3B_CMD="../build/external/q3b/q3b"
 CVC5_CMD="/home/kouba/cvc5/cvc5/build/bin/cvc5"
 BITW_CMD="bitwuzla"
 
+declare -A COMMANDS
+COMMANDS["z3"]="$Z3_CMD"
+COMMANDS["q3b"]="$Q3B_CMD"
+COMMANDS["cvc5"]="$CVC5_CMD"
+COMMANDS["bitw"]="$BITW_CMD"
+
 run_tool() {
     local timeout_val="$1"
     shift
@@ -35,10 +41,10 @@ evaluate_mytool() {
     local total_timeout="$2"
     local half_timeout=$(( total_timeout / 2 ))
 
-    rm out.smt2 out_o.smt2 out_u.smt2
+    rm *.smt2
     cp "$file" out.smt2
-    cp "$file" out_o.smt2
-    cp "$file" out_u.smt2
+    cp "$file" in.smt2
+    cp "$file" simplified.smt2
     local output
     output=$(timeout "$((half_timeout + 2))" taskset -c 0-2 "$MYAPP_CMD" --verbose:1 --timeout:$((half_timeout - 1)) "$file" 2>&1)
     local exit_code=$?
@@ -53,29 +59,65 @@ evaluate_mytool() {
     fi
 }
 
+SECONDARY_TOOLS=("z3" "cvc5" "bitw")
+BASE_TOOLS=("z3" "q3b" "cvc5" "bitw")
 
 cat "$BENCHMARK_FOLDER" | while read -r FILE; do
     echo "Processing benchmark: $FILE"
 
-    # Z3_RESULT=$(run_tool "$TIMEOUT_VAL" "$Z3_CMD" "$FILE")
-    # Q3B_RESULT=$(run_tool "$TIMEOUT_VAL" "$Q3B_CMD" "$FILE")
-    # CVC5_RESULT=$(run_tool "$TIMEOUT_VAL" "$CVC5_CMD" "$FILE")
-    # BITW_RESULT=$(run_tool "$TIMEOUT_VAL" "$BITW_CMD" "$FILE")
+    declare -A TEMP_FILES
+    declare -A PIDS
+
+    ALL_TOOLS=()
+
+    for tool in "${BASE_TOOLS[@]}"; do
+        echo "Launch $tool"
+        TEMP_FILES["$tool"]=$(mktemp)
+        (result=$(run_tool "$TIMEOUT_VAL" "${COMMANDS[$tool]}" "$FILE"); echo "$result" > "${TEMP_FILES[$tool]}") &
+        PIDS["$tool"]=$!
+        ALL_TOOLS+=("$tool")
+    done
 
     MY_TOOL_RESULT=$(evaluate_mytool "$FILE" "$TIMEOUT_VAL")
 
-    MYAPP_Z3_RESULT=$(run_tool "$HALF_TIMEOUT" "$Z3_CMD" "out.smt2")
-    MYAPP_CVC5_RESULT=$(run_tool "$HALF_TIMEOUT" "$CVC5_CMD" "out.smt2")
-    MYAPP_BITW_RESULT=$(run_tool "$HALF_TIMEOUT" "$BITW_CMD" "out.smt2")
+    for tool in "${SECONDARY_TOOLS[@]}"; do
+        tool_name="myapp_parse+$tool"
+        echo "Launch $tool_name"
+        TEMP_FILES["$tool_name"]=$(mktemp)
+        (result=$(run_tool "$HALF_TIMEOUT" "${COMMANDS[$tool]}" "in.smt2"); echo "$result" > "${TEMP_FILES[$tool_name]}") &
+        PIDS["$tool_name"]=$!
+        ALL_TOOLS+=("$tool_name")
+    done
 
-    MYAPP_O_Z3_RESULT=$(run_tool "$HALF_TIMEOUT" "$Z3_CMD" "out_o.smt2")
-    MYAPP_O_CVC5_RESULT=$(run_tool "$HALF_TIMEOUT" "$CVC5_CMD" "out_o.smt2")
-    MYAPP_O_BITW_RESULT=$(run_tool "$HALF_TIMEOUT" "$BITW_CMD" "out_o.smt2")
+    for tool in "${SECONDARY_TOOLS[@]}"; do
+        tool_name="myapp_simpl+$tool"
+        echo "Launch $tool_name"
+        TEMP_FILES["$tool_name"]=$(mktemp)
+        (result=$(run_tool "$HALF_TIMEOUT" "${COMMANDS[$tool]}" "simplified.smt2"); echo "$result" > "${TEMP_FILES[$tool_name]}") &
+        PIDS["$tool_name"]=$!
+        ALL_TOOLS+=("$tool_name")
+    done
 
-    MYAPP_U_Z3_RESULT=$(run_tool "$HALF_TIMEOUT" "$Z3_CMD" "out_u.smt2")
-    MYAPP_U_CVC5_RESULT=$(run_tool "$HALF_TIMEOUT" "$CVC5_CMD" "out_u.smt2")
-    MYAPP_U_BITW_RESULT=$(run_tool "$HALF_TIMEOUT" "$BITW_CMD" "out_u.smt2")
+    for tool in "${SECONDARY_TOOLS[@]}"; do
+        tool_name="myapp_full+$tool"
+        echo "Launch $tool_name"
+        TEMP_FILES["$tool_name"]=$(mktemp)
+        (result=$(run_tool "$HALF_TIMEOUT" "${COMMANDS[$tool]}" "out.smt2"); echo "$result" > "${TEMP_FILES[$tool_name]}") &
+        PIDS["$tool_name"]=$!
+        ALL_TOOLS+=("$tool_name")
+    done
 
-    # echo "$FILE, $Q3B_RESULT, $MY_TOOL_RESULT, $Z3_RESULT, $CVC5_RESULT, $BITW_RESULT, $MYAPP_Z3_RESULT, $MYAPP_CVC5_RESULT, $MYAPP_BITW_RESULT, $MYAPP_O_Z3_RESULT, $MYAPP_O_CVC5_RESULT, $MYAPP_O_BITW_RESULT, $MYAPP_U_Z3_RESULT, $MYAPP_U_CVC5_RESULT, $MYAPP_U_BITW_RESULT" >> "$RESULTS_FILE"
-    echo "$FILE, $MY_TOOL_RESULT, $MYAPP_Z3_RESULT, $MYAPP_CVC5_RESULT, $MYAPP_BITW_RESULT, $MYAPP_O_Z3_RESULT, $MYAPP_O_CVC5_RESULT, $MYAPP_O_BITW_RESULT, $MYAPP_U_Z3_RESULT, $MYAPP_U_CVC5_RESULT, $MYAPP_U_BITW_RESULT" >> "$RESULTS_FILE"
+    for pid in "${!PIDS[@]}"; do
+        wait "${PIDS[$pid]}"
+    done
+
+    RES_LINE="$FILE, $MY_TOOL_RESULT"
+    for tool in "${ALL_TOOLS[@]}"; do
+        tool_name="$tool"
+        RESULT=$(cat "${TEMP_FILES[$tool_name]}")
+        RES_LINE+=", $RESULT"
+        rm "${TEMP_FILES[$tool_name]}"
+    done
+
+    echo "$RES_LINE" >> "$RESULTS_FILE"
 done

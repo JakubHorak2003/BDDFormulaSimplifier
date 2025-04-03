@@ -4,6 +4,7 @@
 #include "FBS_SMTVisitor.h"
 #include "TimeoutManager.h"
 #include "FBSLogger.h"
+#include "Settings.h"
 
 #include "antlr4-runtime.h"
 #include "SMTLIBv2Lexer.h"

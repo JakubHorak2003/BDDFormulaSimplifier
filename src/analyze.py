@@ -57,9 +57,14 @@ def load(filename, tool_names, res):
 
 def main():
     data = {}
-    load('results_v5_fixaff_over.txt', ['', 'new_myapp_over+z3', 'new_myapp_over+cvc5', 'new_myapp_over+bitw'], data)
+    # load('results_v5_fixaff_over.txt', ['', 'new_myapp_over+z3', 'new_myapp_over+cvc5', 'new_myapp_over+bitw'], data)
     load('results_v5.txt', ['q3b', ''] + SECONDARY_TOOLS + ['myapp+' + t for t in SECONDARY_TOOLS] + ['myapp_over+' + t for t in SECONDARY_TOOLS] + ['myapp_under+' + t for t in SECONDARY_TOOLS], data)
-    load('results.txt', [''] + ['n2myapp+' + t for t in SECONDARY_TOOLS] + ['n2myapp_over+' + t for t in SECONDARY_TOOLS] + ['n2myapp_under+' + t for t in SECONDARY_TOOLS], data)
+    # load('results_v5_lim_thr.txt', ['', '2_new_myapp_over(1)+bitw', '2_new_myapp_over(2)+bitw'], data)
+    # load('results.txt', ['', '2_new_myapp_over(2)+bitw'], data)
+
+    # load('results_v5.txt', ['q3b', ''] + SECONDARY_TOOLS, data)
+    # load('results_v5_lim_thr.txt', ['', '', 'myapp+bitw'], data)
+    # load('results.txt', ['', 'myapp+bitw'], data)
 
     total_perf = defaultdict(int)
     sat_perf = defaultdict(int)
@@ -67,9 +72,9 @@ def main():
 
     myapp_only = 0
 
+    rerun = []
+
     for benchmark, results_dct in data.items():
-        if 'n2myapp+z3' not in results_dct:
-            continue
         # augment_tools(results_dct)
 
         all_res = set(results_dct.values())
@@ -86,14 +91,12 @@ def main():
         total_perf['total'] += 1
         by_res_perf['total'] += 1
 
-        if solved_tools and all('new_myapp' in t for t in solved_tools) and any('new_myapp' in t for t in solved_tools):
-            print('My app only', benchmark)
-            myapp_only += 1
-
-        if 'myapp_over+bitw' in solved_tools and 'new_myapp_over+bitw' not in solved_tools:
-            print('WORSE', benchmark)
-        if 'myapp_over+bitw' not in solved_tools and 'new_myapp_over+bitw' in solved_tools:
-            print('BETTER', benchmark)
+        if '2_new_myapp_over(2)+bitw' in solved_tools and 'new_myapp_over+bitw' not in solved_tools:
+            print('BETTER', benchmark, bench_res)
+            rerun.append(benchmark)
+        if '2_new_myapp_over(2)+bitw' not in solved_tools and 'new_myapp_over+bitw' in solved_tools:
+            print('WORSE', benchmark, bench_res)
+            rerun.append(benchmark)
 
     print('Total:')
     print_stats(total_perf)
@@ -105,6 +108,9 @@ def main():
     print_stats(unsat_perf)
 
     print('My app only:', myapp_only)
+
+    with open('rerun.txt', 'w') as file:
+        file.write('\n'.join(rerun))
 
 if __name__ == "__main__":
     main()
