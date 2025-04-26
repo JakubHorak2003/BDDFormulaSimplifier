@@ -247,10 +247,6 @@ z3::expr FormulaSimplifier::RemoveInternal(z3::expr e)
         if (decl_kind == Z3_OP_BUREM_I)
             return z3::urem(sim[0], sim[1]);
 
-        if (decl_kind == Z3_OP_IMPLIES)
-            return !sim[0] || sim[1];
-
-
         return f(sim);
     }
 

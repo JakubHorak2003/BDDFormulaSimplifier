@@ -31,18 +31,7 @@ def add_tool(dct, subtools):
     dct[name] = result
 
 def augment_tools(dct):
-    add_tool(dct, [t for t in dct if 'myapp' in t])
-    add_tool(dct, [t for t in dct if 'myapp' not in t and t != 'q3b'])
-    return
     tools = list(dct.keys())
-    for tool_over in tools:
-        for tool_under in tools:
-            if tool_over >= tool_under:
-                continue
-            
-            name = f'{tool_over}||{tool_under}'
-            result = combine_results([dct[tool_over], dct[tool_under]])
-            dct[name] = result
 
 def load(filename, tool_names, res):
     with open(filename) as file:
@@ -58,13 +47,27 @@ def load(filename, tool_names, res):
 def main():
     data = {}
     # load('results_v5_fixaff_over.txt', ['', 'new_myapp_over+z3', 'new_myapp_over+cvc5', 'new_myapp_over+bitw'], data)
-    load('results_v5.txt', ['q3b', ''] + SECONDARY_TOOLS + ['myapp+' + t for t in SECONDARY_TOOLS] + ['myapp_over+' + t for t in SECONDARY_TOOLS] + ['myapp_under+' + t for t in SECONDARY_TOOLS], data)
-    # load('results_v5_lim_thr.txt', ['', '2_new_myapp_over(1)+bitw', '2_new_myapp_over(2)+bitw'], data)
-    # load('results.txt', ['', '2_new_myapp_over(2)+bitw'], data)
+    # load('results_v5.txt', ['old_q3b', ''] + ['old_'+t for t in SECONDARY_TOOLS], data)
+    # load('results_v5_lim_thr.txt', ['', '', '2_new_myapp_over(2)+bitw'], data)
+    # load('results_v5_lim_thr_rerun.txt', ['', '2_new_myapp_over(2)+bitw'], data)
 
     # load('results_v5.txt', ['q3b', ''] + SECONDARY_TOOLS, data)
     # load('results_v5_lim_thr.txt', ['', '', 'myapp+bitw'], data)
     # load('results.txt', ['', 'myapp+bitw'], data)
+    
+    load('results_v6.txt', ['', 'z3_16', 'q3b_16', 'cvc5_16', 'bitw_16'] + ['' for t in SECONDARY_TOOLS] + ['' for t in SECONDARY_TOOLS] + ['myapp_8+' + t + '_8' for t in SECONDARY_TOOLS], data)
+    load('results_v6_10_50.txt', ['', 'z3_60', 'q3b_60', 'cvc5_60', 'bitw_60'], data)
+    # load('results_v6_20_40.txt', ['', '', 'z3', 'q3b', 'cvc5', 'bitw'] + ['myapp+' + t for t in SECONDARY_TOOLS], data)
+    load('results_v7_20_40.txt', ['', ''] + [f'myapp_20+{t}_40' for t in SECONDARY_TOOLS], data)
+    load('results_v7_30_30.txt', ['', ''] + [f'myapp_30+{t}_30' for t in SECONDARY_TOOLS], data)
+    load('results.txt', ['', ''] + [f'myapp_10+{t}_50' for t in SECONDARY_TOOLS], data)
+    #load('results.txt', ['', ''] + ['30myapp+' + t for t in SECONDARY_TOOLS], data)
+
+    with open('out.csv', 'w') as file:
+        keys = list(next(iter(data.values())).keys())
+        print(','.join(keys), file=file)
+        for bench, res in data.items():
+            print(bench,*res.values(),file=file,sep=',')
 
     total_perf = defaultdict(int)
     sat_perf = defaultdict(int)
@@ -73,9 +76,12 @@ def main():
     myapp_only = 0
 
     rerun = []
+    diff = 0
+
+    myapp_stats = defaultdict(lambda: [0] * 8)
 
     for benchmark, results_dct in data.items():
-        # augment_tools(results_dct)
+        augment_tools(results_dct)
 
         all_res = set(results_dct.values())
         if {'sat', 'unsat'} <= all_res:
@@ -84,19 +90,30 @@ def main():
         
         bench_res = 'sat' if 'sat' in all_res else 'unsat' if 'unsat' in all_res else 'unknown'
         solved_tools = [t for t, r in results_dct.items() if r == bench_res]
-        by_res_perf = sat_perf if bench_res == 'sat' else unsat_perf
+        if solved_tools:
+            solved_tools.append('total solved')
+        by_res_perf = sat_perf if bench_res == 'sat' else unsat_perf if bench_res == 'unsat' else defaultdict(int)
         for t in solved_tools:
             total_perf[t] += 1
             by_res_perf[t] += 1
         total_perf['total'] += 1
         by_res_perf['total'] += 1
 
-        if '2_new_myapp_over(2)+bitw' in solved_tools and 'new_myapp_over+bitw' not in solved_tools:
-            print('BETTER', benchmark, bench_res)
-            rerun.append(benchmark)
-        if '2_new_myapp_over(2)+bitw' not in solved_tools and 'new_myapp_over+bitw' in solved_tools:
-            print('WORSE', benchmark, bench_res)
-            rerun.append(benchmark)
+        if results_dct['myapp_20+bitw_40'] != results_dct['myapp_10+bitw_50']:
+            diff += 1
+
+        if solved_tools and all('myapp' in t or t == 'total solved' for t in solved_tools):
+            print('MYAPP', benchmark, bench_res, solved_tools)
+            myapp_only += 1
+
+        for st in SECONDARY_TOOLS:
+            a = int('q3b_60' in solved_tools)
+            b = int(f'{st}_60' in solved_tools)
+            c = int(f'myapp_20+{st}_40' in solved_tools)
+            myapp_stats[st][a | (b << 1) | (c << 2)] += 1
+            if solved_tools:
+                myapp_stats[st+'_'+bench_res][a | (b << 1) | (c << 2)] += 1
+
 
     print('Total:')
     print_stats(total_perf)
@@ -108,6 +125,9 @@ def main():
     print_stats(unsat_perf)
 
     print('My app only:', myapp_only)
+    print('Diff:', diff)
+
+    print(myapp_stats)
 
     with open('rerun.txt', 'w') as file:
         file.write('\n'.join(rerun))

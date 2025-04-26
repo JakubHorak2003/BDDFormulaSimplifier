@@ -65,7 +65,7 @@ void SimplifierThread::RunApprox()
     int prec = 1;
     std::vector<int> node_counts;
     node_counts.push_back(0);
-    while (bw <= 128 && prec <= 16)
+    while (bw <= 128)
     {
         // logger.Log("Running expr to bdd (over = " + std::to_string(overapproximate) +
         //             "; bw = " + std::to_string(bw) + "; prec = " + std::to_string(prec) + ")...");
@@ -124,6 +124,8 @@ void SimplifierThread::RunApprox()
         else
             bw += 2;
     }
+
+    logger.Log("Done");
 }
 
 z3::expr SimplifierThread::BDDToFormula(DdNode* node)
