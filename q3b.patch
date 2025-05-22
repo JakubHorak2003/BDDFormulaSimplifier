@@ -1,0 +1,26 @@
+diff --git a/lib/ExprToBDDTransformer.cpp b/lib/ExprToBDDTransformer.cpp
+index 32a9e78..4bf0e52 100644
+--- a/lib/ExprToBDDTransformer.cpp
++++ b/lib/ExprToBDDTransformer.cpp
+@@ -469,7 +469,7 @@ BDDInterval ExprToBDDTransformer::getBDDFromExpr(const expr &e, const vector<bou
+ 	}
+ 
+ 	BDDInterval bodyBdd;
+-	if (onlyExistentials)
++	if (false && onlyExistentials)
+ 	{
+ 	    if (Z3_is_quantifier_forall(*context, ast))
+ 	    {
+diff --git a/lib/ExprToBDDTransformer.h b/lib/ExprToBDDTransformer.h
+index 2229946..a2404b6 100644
+--- a/lib/ExprToBDDTransformer.h
++++ b/lib/ExprToBDDTransformer.h
+@@ -29,7 +29,7 @@ using namespace cudd;
+ 
+ class ExprToBDDTransformer
+ {
+-  private:
++  public:
+     Cudd bddManager;
+ 
+     std::map<std::string, Bvec> vars;
