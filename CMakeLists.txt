@@ -1,33 +1,12 @@
 cmake_minimum_required(VERSION 3.10)
-project(Bakalarka)
+project(FBS)
 
 set(CMAKE_CXX_STANDARD 17)
 
-# Add Q3B as a subdirectory (this processes Q3B's CMakeLists.txt)
 add_subdirectory(external/q3b)
 
-# Create an INTERFACE library to aggregate Q3B’s include directories.
 add_library(q3b_includes INTERFACE)
 
-# Q3B’s CMakeLists.txt adds these include directories:
-#
-# 1. Z3 include directories from find_package(Z3 CONFIG):
-#      include_directories(${Z3_CXX_INCLUDE_DIRS})
-#
-# 2. CUDD include directories:
-#      set(CUDD_DIR "contrib/cudd")
-#      include_directories(${CUDD_DIR}/cudd ${CUDD_DIR}/cplusplus)
-#    Since Q3B is a submodule, these resolve to:
-#      ${CMAKE_CURRENT_SOURCE_DIR}/external/q3b/contrib/cudd/cudd
-#      ${CMAKE_CURRENT_SOURCE_DIR}/external/q3b/contrib/cudd/cplusplus
-#
-# 3. ANTLR include directories:
-#      include_directories(SYSTEM ${ANTLR4_INCLUDE_DIRS})
-#      include_directories(SYSTEM ${ANTLR_SmtLibParser_OUTPUT_DIR})
-#
-# 4. Optionally, you may want to add Q3B’s own source directory:
-#      ${CMAKE_CURRENT_SOURCE_DIR}/external/q3b/lib
-#
 target_include_directories(q3b_includes INTERFACE
     ${Z3_CXX_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/external/q3b/contrib/z3/src/api/c++
@@ -40,9 +19,7 @@ target_include_directories(q3b_includes INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/external/q3b/lib
 )
 
-# Now add your own executable target.
-add_executable(myapp src/main.cpp src/FBS_SMTVisitor.cpp src/FormulaSimplifier.cpp src/FBSLogger.cpp src/SimplifierThread.cpp src/SimplifierBasic.cpp src/TimeoutManager.cpp src/Settings.cpp)
+add_executable(fbs src/main.cpp src/FBS_SMTVisitor.cpp src/FormulaSimplifier.cpp src/FBSLogger.cpp src/SimplifierThread.cpp src/SimplifierBasic.cpp src/TimeoutManager.cpp src/Settings.cpp)
 
-# Link your executable with both the Q3B library and the interface target carrying include directories.
-target_link_libraries(myapp PRIVATE q3blib q3b_includes)
+target_link_libraries(fbs PRIVATE q3blib q3b_includes)
 
