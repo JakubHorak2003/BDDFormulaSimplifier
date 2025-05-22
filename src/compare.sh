@@ -1,6 +1,6 @@
 
 if [ "$#" -ne 3 ]; then
-    echo "Usage: $0 <benchmark_folder> <timeout> <tmo for myapp>"
+    echo "Usage: $0 <benchmark_folder> <timeout> <tmo for fbs>"
     exit 1
 fi
 
@@ -11,7 +11,7 @@ MYAPP_TIMEOUT_MS=$(( MYAPP_TIMEOUT * 1000 ))
 SECOND_TIMEOUT=$((TIMEOUT_VAL - MYAPP_TIMEOUT))
 RESULTS_FILE="results.txt"
 
-MYAPP_CMD="taskset -c 0 ../build/myapp"
+MYAPP_CMD="taskset -c 0 ../build/fbs"
 Z3_CMD="z3"
 Q3B_CMD="taskset -c 1 ../build/external/q3b/q3b"
 CVC5_CMD="/home/kouba/cvc5/cvc5/build/bin/cvc5"

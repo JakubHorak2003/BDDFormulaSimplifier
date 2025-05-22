@@ -4,13 +4,14 @@ FBS is a quantified bit-vector formula simplificator that uses BDD approximation
 
 ## Instalation
 
-Make sure to clone this repository using `--recursive` to clone all the submodules as well. Then install the dependencies for Q3B by running
+Make sure to clone this repository using `--recursive` to clone all the submodules as well. Then install the patch and the dependencies for Q3B by running
 ```
 cd external/q3b
+git apply ../../q3b.patch
 bash contrib/get_deps.sh
 ``` 
 
-To compile FBS, run
+To compile FBS, run the following in the main directory
 ```
 mkdir build
 cd build
