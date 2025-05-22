@@ -3,3 +3,4 @@ build/*
 src/*.smt2
 src/*.dot
 src/*.txt
+out.csv

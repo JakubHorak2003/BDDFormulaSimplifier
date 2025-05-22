@@ -27,6 +27,7 @@ void PrintUsage(const char* argv0)
     std::cout << "    --timeout:n timeout in seconds, 0 for no timeout, default 0\n";
     std::cout << "    --use-over:[1/0] whether to use overapproximations, default 1\n";
     std::cout << "    --use-under:[1/0] whether to use underapproximations, default 0\n";
+    std::cout << "    --max-quants:n maximum number of quantifiers, 0 for no limit, default 0\n";
 }
 
 int main(int argc, char** argv) 
@@ -55,6 +56,10 @@ int main(int argc, char** argv)
         else if (sscanf(argv[i], "--use-under:%d", &x) == 1 && x >= 0 && x <= 1)
         {
             settings.use_under = (bool)x;
+        }
+        else if (sscanf(argv[i], "--max-quants:%d", &x) == 1)
+        {
+            settings.max_quants = x;
         }
         else
         {

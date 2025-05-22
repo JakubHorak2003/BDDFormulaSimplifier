@@ -39,7 +39,7 @@ z3::expr FormulaSimplifier::RunSimplifications()
     CountQuantifiers(expr, 0, quant_cnts);
     int depth = 0;
     int total = 0;
-    while (total < 10 && depth < (int)quant_cnts.size())
+    while ((!settings.max_quants || total < settings.max_quants) && depth < (int)quant_cnts.size())
         total += quant_cnts[depth++];
     logger.Log("Using depth = " + std::to_string(depth) + "/" + std::to_string(quant_cnts.size()) + " with " + std::to_string(total) + " total quantifiers");
 

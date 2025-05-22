@@ -7,12 +7,13 @@ fi
 BENCHMARK_FOLDER="$1"
 TIMEOUT_VAL="$2"
 MYAPP_TIMEOUT="$3"
+MYAPP_TIMEOUT_MS=$(( MYAPP_TIMEOUT * 1000 ))
 SECOND_TIMEOUT=$((TIMEOUT_VAL - MYAPP_TIMEOUT))
 RESULTS_FILE="results.txt"
 
-MYAPP_CMD="../build/myapp"
+MYAPP_CMD="taskset -c 0 ../build/myapp"
 Z3_CMD="z3"
-Q3B_CMD="../build/external/q3b/q3b"
+Q3B_CMD="taskset -c 1 ../build/external/q3b/q3b"
 CVC5_CMD="/home/kouba/cvc5/cvc5/build/bin/cvc5"
 BITW_CMD="bitwuzla"
 
@@ -25,15 +26,20 @@ COMMANDS["bitw"]="$BITW_CMD"
 run_tool() {
     local timeout_val="$1"
     shift
+    local start_time_ms=$(date +%s%3N)
     local output
-    output=$(timeout "$timeout_val" "$@" 2>&1)
+    output=$(timeout "$timeout_val" $@ 2>&1)
     local exit_code=$?
+    local end_time_ms=$(date +%s%3N)
+    local duration_ms=$(( end_time_ms - start_time_ms ))
     if [ $exit_code -eq 124 ]; then
-        echo "timeout"
+        echo "timeout $duration_ms"
     elif [ $exit_code -gt 0 ]; then
-        echo "crash"
+        echo "crash $duration_ms"
     else
-        echo "$output" | tail -n 1
+        local res
+        res=$(echo "$output" | tail -n 1)
+        echo "$res $duration_ms"
     fi
 }
 
@@ -45,17 +51,20 @@ evaluate_mytool() {
     cp "$file" out.smt2
     cp "$file" in.smt2
     cp "$file" simplified.smt2
+    local start_time_ms=$(date +%s%3N)
     local output
-    output=$(timeout "$((timeout + 2))" taskset -c 0-2 "$MYAPP_CMD" --verbose:1 --timeout:$((timeout - 1)) "$file" 2>&1)
+    output=$(timeout "$((timeout + 2))" $MYAPP_CMD --verbose:1 --timeout:$((timeout - 1)) "$file" 2>&1)
     local exit_code=$?
-    echo "$file" >> log.txt
+    local end_time_ms=$(date +%s%3N)
+    local duration_ms=$(( end_time_ms - start_time_ms ))
+    echo "$file $timeout $start_time_ms" >> log.txt
     echo "$output" >> log.txt
     if [ $exit_code -eq 124 ]; then
-        echo "myapp_timeout"
+        echo "myapp_timeout $duration_ms"
     elif [ $exit_code -gt 0 ]; then
-        echo "myapp_crash"
+        echo "myapp_crash $duration_ms"
     else
-        echo "succ"
+        echo "succ $duration_ms"
     fi
 }
 
@@ -70,22 +79,19 @@ cat "$BENCHMARK_FOLDER" | while read -r FILE; do
 
     ALL_TOOLS=()
 
-    # for tool in "${BASE_TOOLS[@]}"; do
-    #     TEMP_FILES["$tool"]=$(mktemp)
-    #     (result=$(run_tool "$TIMEOUT_VAL" "${COMMANDS[$tool]}" "$FILE"); echo "$result" > "${TEMP_FILES[$tool]}") &
-    #     PIDS["$tool"]=$!
-    #     ALL_TOOLS+=("$tool")
-    # done
+    for tool in "${BASE_TOOLS[@]}"; do
+        TEMP_FILES["$tool"]=$(mktemp)
+        (result=$(run_tool "$TIMEOUT_VAL" "${COMMANDS[$tool]}" "$FILE"); echo "$result" > "${TEMP_FILES[$tool]}") &
+        PIDS["$tool"]=$!
+        ALL_TOOLS+=("$tool")
+    done
 
-    START_TIME=$(date +%s)
-    MY_TOOL_RESULT=$(evaluate_mytool "$FILE" "$MYAPP_TIMEOUT")
-    END_TIME=$(date +%s)
-    MY_TOOL_DURATION=$(( END_TIME - START_TIME ))
+    read MY_TOOL_RESULT MY_TOOL_DURATION < <(evaluate_mytool "$FILE" "$MYAPP_TIMEOUT")
 
-    if [ $MY_TOOL_DURATION -gt $MYAPP_TIMEOUT ]; then
-        MY_TOOL_DURATION=$MYAPP_TIMEOUT
+    if [ $MY_TOOL_DURATION -gt $MYAPP_TIMEOUT_MS ]; then
+        MY_TOOL_DURATION=$MYAPP_TIMEOUT_MS
     fi
-    REMAINING_TIME=$(( TIMEOUT_VAL - MY_TOOL_DURATION ))
+    REMAINING_TIME=$(( TIMEOUT_VAL - ((MY_TOOL_DURATION + 500) / 1000) ))
 
     # for tool in "${SECONDARY_TOOLS[@]}"; do
     #     tool_name="myapp_parse+$tool"
@@ -118,8 +124,8 @@ cat "$BENCHMARK_FOLDER" | while read -r FILE; do
     RES_LINE="$FILE, $MY_TOOL_RESULT, $MY_TOOL_DURATION"
     for tool in "${ALL_TOOLS[@]}"; do
         tool_name="$tool"
-        RESULT=$(cat "${TEMP_FILES[$tool_name]}")
-        RES_LINE+=", $RESULT"
+        read RESULT DUR < <(cat "${TEMP_FILES[$tool_name]}")
+        RES_LINE+=", $RESULT, $DUR"
         rm "${TEMP_FILES[$tool_name]}"
     done
 

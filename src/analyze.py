@@ -8,9 +8,10 @@ def is_solved(result):
 
 SECONDARY_TOOLS = ['z3', 'cvc5', 'bitw']
 
-def print_stats(data):
-    total = data['total']
+def print_stats(data, rem=0):
+    total = data['total'] + rem
     for tool, cnt in sorted(data.items(), key=lambda x:-x[1]):
+        cnt += rem
         print(f'    {tool}: {cnt} ({cnt/total*100:.2f} %)')
 
 def combine_results(results):
@@ -31,9 +32,20 @@ def add_tool(dct, subtools):
     dct[name] = result
 
 def augment_tools(dct):
-    tools = list(dct.keys())
+    pass
+    # add_tool(dct, ['q3b_60', 'bitw_60'])
+    # add_tool(dct, ['myapp_20+bitw_40', 'bitw_60'])
+    # for t in SECONDARY_TOOLS:
+    #     vt = [f'{t}_60'] + [f'myapp_{x}+{t}_{60-x}' for x in [10, 20, 30]]
+    #     dct[f'vbs_{t}'] = combine_results([dct[x] for x in vt])
+    # for x in [10, 20, 30]:
+    #     vt = [f'myapp_{x}+{t}_{60-x}' for t in SECONDARY_TOOLS]
+    #     dct[f'vbs_{x}'] = combine_results([dct[t] for t in vt])
+    # vt = ['q3b_60'] + [f'{t}_60' for t in SECONDARY_TOOLS]
+    # dct[f'vbs_0'] = combine_results([dct[t] for t in vt])
+    # dct[f'vbs_1'] = combine_results([v for k, v in dct.items() if 'myapp' in k])
 
-def load(filename, tool_names, res):
+def load(filename, tool_names, res, durs=None):
     with open(filename) as file:
         lines = file.read().strip().split('\n')
     for line in lines:
@@ -44,10 +56,28 @@ def load(filename, tool_names, res):
             if t != '':
                 res[benchmark][t] = r
 
+def load_v2(filename, tool_names, res, durs=None):
+    with open(filename) as file:
+        lines = file.read().strip().split('\n')
+    for line in lines:
+        benchmark, *results = [p.strip() for p in line.strip().split(',')]
+        if benchmark not in res:
+            res[benchmark] = {}
+        if durs is not None and benchmark not in durs:
+            durs[benchmark] = {}
+        for t, r, d in zip(tool_names, results[::2], results[1::2]):
+            if t != '':
+                res[benchmark][t] = r
+                if durs is not None:
+                    try:
+                        durs[benchmark][t] = int(d)
+                    except ValueError:
+                        print('ERROR', line)
+
 def main():
     data = {}
     # load('results_v5_fixaff_over.txt', ['', 'new_myapp_over+z3', 'new_myapp_over+cvc5', 'new_myapp_over+bitw'], data)
-    # load('results_v5.txt', ['old_q3b', ''] + ['old_'+t for t in SECONDARY_TOOLS], data)
+    # load('results_v5.txt', ['q3b', ''] + SECONDARY_TOOLS + ['myapp_'+t for t in SECONDARY_TOOLS] + ['myappover_'+t for t in SECONDARY_TOOLS] + ['myappunder_'+t for t in SECONDARY_TOOLS], data)
     # load('results_v5_lim_thr.txt', ['', '', '2_new_myapp_over(2)+bitw'], data)
     # load('results_v5_lim_thr_rerun.txt', ['', '2_new_myapp_over(2)+bitw'], data)
 
@@ -55,13 +85,23 @@ def main():
     # load('results_v5_lim_thr.txt', ['', '', 'myapp+bitw'], data)
     # load('results.txt', ['', 'myapp+bitw'], data)
     
-    load('results_v6.txt', ['', 'z3_16', 'q3b_16', 'cvc5_16', 'bitw_16'] + ['' for t in SECONDARY_TOOLS] + ['' for t in SECONDARY_TOOLS] + ['myapp_8+' + t + '_8' for t in SECONDARY_TOOLS], data)
+    # load('results_v6.txt', ['', 'z3_v6', 'q3b_v6', 'cvc5_v6', 'bitw_v6'] + ['dump_' + t for t in SECONDARY_TOOLS] + ['simpl_' + t for t in SECONDARY_TOOLS] + ['myapp_' + t + '_v6' for t in SECONDARY_TOOLS], data)
     load('results_v6_10_50.txt', ['', 'z3_60', 'q3b_60', 'cvc5_60', 'bitw_60'], data)
     # load('results_v6_20_40.txt', ['', '', 'z3', 'q3b', 'cvc5', 'bitw'] + ['myapp+' + t for t in SECONDARY_TOOLS], data)
     load('results_v7_20_40.txt', ['', ''] + [f'myapp_20+{t}_40' for t in SECONDARY_TOOLS], data)
     load('results_v7_30_30.txt', ['', ''] + [f'myapp_30+{t}_30' for t in SECONDARY_TOOLS], data)
-    load('results.txt', ['', ''] + [f'myapp_10+{t}_50' for t in SECONDARY_TOOLS], data)
-    #load('results.txt', ['', ''] + ['30myapp+' + t for t in SECONDARY_TOOLS], data)
+    load('results_v7_10_50.txt', ['', ''] + [f'myapp_10+{t}_50' for t in SECONDARY_TOOLS], data)
+    # load_v2('results_v8_20_40.txt', ['', 'z3_sg', 'q3b_sg', 'cvc5_sg', 'bitw_sg'] + [f'myapp_sg_20+{t}_40' for t in SECONDARY_TOOLS], data)
+    # load_v2('results.txt', ['', 'z3_sg', 'q3b_sg', 'cvc5_sg', 'bitw_sg'] + [f'myapp_sg_20+{t}_40' for t in SECONDARY_TOOLS], data)
+
+    # load('results_v6_10_50.txt', ['', '', 'q3b', '', 'bitw'], data)
+    # load('results_v7_20_40.txt', ['', ''] + ['fbs' if t == 'bitw' else '' for t in SECONDARY_TOOLS], data)
+
+    all_tools = list(next(iter(data.values())).keys())
+    for i in range(315):
+        data[f'sat{i}'] = {t:'sat' for t in all_tools}
+    for i in range(4603):
+        data[f'unsat{i}'] = {t:'unsat' for t in all_tools}
 
     with open('out.csv', 'w') as file:
         keys = list(next(iter(data.values())).keys())
@@ -92,6 +132,27 @@ def main():
         solved_tools = [t for t, r in results_dct.items() if r == bench_res]
         if solved_tools:
             solved_tools.append('total solved')
+
+        # a = int('q3b' in solved_tools)
+        # b = int(f'bitw' in solved_tools)
+        # c = int(f'fbs' in solved_tools)
+        # if a and b and c:
+        #     solved_tools.append('solved by all')
+        # if not a and not b and not c:
+        #     solved_tools.append('solved by none')
+        # if not a and not b and c:
+        #     solved_tools.append('solved by fbs only')
+        # if a and b and not c:
+        #     solved_tools.append('solved by all but fbs')
+        # if c and not b:
+        #     solved_tools.append('solved by fbs but not bitwuzla')
+        # if not c and b:
+        #     solved_tools.append('solved by bitwuzla but not fbs')
+        # if c and not a:
+        #     solved_tools.append('solved by fbs but not q3b')
+        # if not c and a:
+        #     solved_tools.append('solved by q3b but not fbs')
+
         by_res_perf = sat_perf if bench_res == 'sat' else unsat_perf if bench_res == 'unsat' else defaultdict(int)
         for t in solved_tools:
             total_perf[t] += 1
@@ -99,20 +160,10 @@ def main():
         total_perf['total'] += 1
         by_res_perf['total'] += 1
 
-        if results_dct['myapp_20+bitw_40'] != results_dct['myapp_10+bitw_50']:
-            diff += 1
-
         if solved_tools and all('myapp' in t or t == 'total solved' for t in solved_tools):
             print('MYAPP', benchmark, bench_res, solved_tools)
             myapp_only += 1
 
-        for st in SECONDARY_TOOLS:
-            a = int('q3b_60' in solved_tools)
-            b = int(f'{st}_60' in solved_tools)
-            c = int(f'myapp_20+{st}_40' in solved_tools)
-            myapp_stats[st][a | (b << 1) | (c << 2)] += 1
-            if solved_tools:
-                myapp_stats[st+'_'+bench_res][a | (b << 1) | (c << 2)] += 1
 
 
     print('Total:')
