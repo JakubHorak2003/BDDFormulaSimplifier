@@ -3,16 +3,18 @@
 #include "SimplifierThread.h"
 #include "SimplifierBasic.h"
 #include "FBSLogger.h"
+#include "Settings.h"
+#include "Pattern.h"
 
 #include "Solver.h"
 
-z3::expr Translate(z3::expr e, z3::context& ctx)
+z3::expr Translate(z3::expr e, z3::context &ctx)
 {
     auto res = z3::expr(ctx, Z3_translate(e.ctx(), e, ctx));
     return res;
 }
 
-std::vector<z3::expr> Translate(const std::vector<z3::expr>& es, z3::context& ctx)
+std::vector<z3::expr> Translate(const std::vector<z3::expr> &es, z3::context &ctx)
 {
     std::vector<z3::expr> res;
     int sz = (int)es.size();
@@ -55,7 +57,7 @@ void SimplifierThread::RunApprox()
 {
     if (Solver::resultComputed)
         return;
-        
+
     if (!overapproximate)
         transformer->setApproximationType(ZERO_EXTEND);
 
@@ -76,19 +78,19 @@ void SimplifierThread::RunApprox()
             bdds = transformer->ProcessUnderapproximation(bw, prec);
         if (Solver::resultComputed)
             return;
-        const auto& bdd = overapproximate ? bdds.upper : bdds.lower;
+        const auto &bdd = overapproximate ? bdds.upper : bdds.lower;
         // logger.DumpFormulaBDD(expr, bdd.upper);
 
         if (overapproximate && bdd.IsZero())
         {
-            logger.Log("Bdd always false");
+            logger.Log("Bdd always false " + approx_str + " " + std::to_string(bw) + " " + std::to_string(prec));
             result.clear();
             result.push_back(expr.ctx().bool_val(false));
             return;
         }
         if (!overapproximate && bdd.IsOne())
         {
-            logger.Log("Bdd always true");
+            logger.Log("Bdd always true " + approx_str + " " + std::to_string(bw) + " " + std::to_string(prec));
             result.clear();
             auto cand = FixUnder(expr.ctx().bool_val(true), bw);
             assert(!isFalse(cand));
@@ -100,18 +102,15 @@ void SimplifierThread::RunApprox()
         if (nc != node_counts.back() && !bdd.IsZero() && !bdd.IsOne())
         {
             logger.Log("Useful result returned (" + std::to_string(bdd.nodeCount()) + " nodes) " + approx_str + " " + std::to_string(bw) + " " + std::to_string(prec));
+            // logger.DumpBDD(bdd);
             auto cand = BDDToFormula(bdd);
             // auto cand = BDDToFormulaApprox(bdd, 5);
-            // logger.DumpFormulaBDD(cand, bdd);
+            if (settings.dump_bdds)
+                logger.DumpFormulaBDD(cand, bdd);
             if (!overapproximate)
                 cand = FixUnder(cand, bw);
             if (Solver::resultComputed)
                 return;
-            while (nc < node_counts.back())
-            {
-                node_counts.pop_back();
-                result.pop_back();
-            }
             node_counts.push_back(nc);
             assert(!isFalse(cand) && !isTrue(cand));
             result.push_back(cand);
@@ -128,95 +127,107 @@ void SimplifierThread::RunApprox()
     logger.Log("Done");
 }
 
-z3::expr SimplifierThread::BDDToFormula(DdNode* node)
+BDDNode GetNodeChild(const BDDNode &node, bool branch)
 {
+    if (branch)
+        return {Cudd_T(node.first), node.second};
+    if (Cudd_IsComplement(Cudd_E(node.first)))
+        return {Cudd_Regular(Cudd_E(node.first)), !node.second};
+    return {Cudd_E(node.first), node.second};
+}
+
+z3::expr SimplifierThread::BDDToFormula(const BDDNode &node)
+{
+    if (Solver::resultComputed)
+        return expr.ctx().bool_val(false);
+
     if (expr_cache.find(node) != expr_cache.end())
         return expr_cache.at(node);
 
-    z3::expr texpr = BDDToFormula(Cudd_Regular(Cudd_T(node)));
-    if (Solver::resultComputed)
-        return expr.ctx().bool_val(false);
-    z3::expr fexpr = BDDToFormula(Cudd_Regular(Cudd_E(node)));
-    if (Solver::resultComputed)
-        return expr.ctx().bool_val(false);
+    auto var = GetNodeVar(node.first);
+    auto tchild = GetNodeChild(node, true);
+    auto fchild = GetNodeChild(node, false);
+    auto texpr = BDDToFormula(tchild);
+    auto fexpr = BDDToFormula(fchild);
 
-    if (Cudd_IsComplement(Cudd_E(node)))
-        fexpr = simplifyNot(fexpr);
+    if (var.var.is_bool())
+    {
+        auto result = simplifyIte(var.var, texpr, fexpr);
+        expr_cache.emplace(node, result);
+        return result;
+    }
 
-    int idx = Cudd_NodeReadIndex(node);
-    const auto&[name, bit] = idx_to_var.at(idx);
-    z3::expr var = vars.at(name);
-    if (!var.is_bool())
-        var = var.extract(bit, bit) == expr.ctx().bv_val(1, 1);
+    EqNumeral cnt(var, NumeralVal("1"));
+    EqNumeral cnf(var, NumeralVal("0"));
+    auto result = simplifyIte(cnt.ToExpr(), texpr, fexpr, cnf.ToExpr());
 
-    z3::expr result = simplifyIte(var, texpr, fexpr);
+    assert((!isOr(result) && !isAnd(result)) || result.num_args() == 2);
     expr_cache.emplace(node, result);
     return result;
 }
 
-z3::expr SimplifierThread::BDDToFormula(const BDD& bdd)
+z3::expr SimplifierThread::BDDToFormulaWithPatterns(const BDDNode &node)
 {
-    expr_cache.clear();
-    idx_to_var.clear();
-    for (const auto&[name, bvec] : transformer->vars)
-    {
-        for (int i = 0; i < bvec.bitnum(); ++i)
-        {
-            int idx = bvec[i].GetBDD().NodeReadIndex();
-            idx_to_var[idx] = std::make_pair(name, i);
-        }
-    }
-    expr_cache.emplace(Cudd_ReadOne(bdd.manager()), expr.ctx().bool_val(true));
-    expr_cache.emplace(Cudd_ReadZero(bdd.manager()), expr.ctx().bool_val(false));
-
-    auto ne = BDDToFormula(bdd.getRegularNode());
     if (Solver::resultComputed)
         return expr.ctx().bool_val(false);
 
-    if (Cudd_IsComplement(bdd.getNode()))
-        ne = simplifyNot(ne);
+    if (expr_cache.find(node) != expr_cache.end())
+        return expr_cache.at(node);
 
-    return ne;
-}
+    auto var = GetNodeVar(node.first);
+    auto tchild = GetNodeChild(node, true);
+    auto fchild = GetNodeChild(node, false);
 
-ApproxExpr SimplifierThread::BDDToFormulaApprox(DdNode *node, std::size_t max_size)
-{
-    if (approx_expr_cache.find(node) != approx_expr_cache.end())
-        return approx_expr_cache.at(node);
+    if (var.var.is_bool())
+    {
+        auto texpr = BDDToFormulaWithPatterns(tchild);
+        auto fexpr = BDDToFormulaWithPatterns(fchild);
+        auto result = simplifyIte(var.var, texpr, fexpr);
+        expr_cache.emplace(node, result);
+        return result;
+    }
 
-    const auto& texpr = BDDToFormulaApprox(Cudd_Regular(Cudd_T(node)), max_size);
-    if (Solver::resultComputed)
-        return ApproxExpr(expr.ctx());
-    const auto& fexpr = BDDToFormulaApprox(Cudd_Regular(Cudd_E(node)), max_size);
-    if (Solver::resultComputed)
-        return ApproxExpr(expr.ctx());
+    auto tvar = GetNodeVar(tchild.first);
+    auto fvar = GetNodeVar(fchild.first);
+    z3::expr result(expr.ctx());
+    if (tvar == fvar && !tvar.IsInvalid() && GetNodeChild(tchild, true) == GetNodeChild(fchild, false) && GetNodeChild(tchild, false) == GetNodeChild(fchild, true))
+    {
+        EqVar cv(var, tvar);
+        auto texpr = BDDToFormulaWithPatterns(GetNodeChild(tchild, true));
+        auto fexpr = BDDToFormulaWithPatterns(GetNodeChild(tchild, false));
+        result = MergeEq(cv, texpr, fexpr);
+    }
+    else if (!fvar.IsInvalid() && fvar.var.to_string() != var.var.to_string() && GetNodeChild(fchild, false) == tchild)
+    {
+        auto texpr = BDDToFormulaWithPatterns(tchild);
+        auto fexpr = BDDToFormulaWithPatterns(GetNodeChild(fchild, true));
+        IneqVar iv(fvar, var, true);
+        result = MergeIneq(iv, texpr, fexpr);
+    }
+    else if (!tvar.IsInvalid() && tvar.var.to_string() != var.var.to_string() && GetNodeChild(tchild, true) == fchild)
+    {
+        auto texpr = BDDToFormulaWithPatterns(fchild);
+        auto fexpr = BDDToFormulaWithPatterns(GetNodeChild(tchild, false));
+        IneqVar iv(var, tvar, true);
+        result = MergeIneq(iv, texpr, fexpr);
+    }
+    else
+    {
+        auto texpr = BDDToFormulaWithPatterns(tchild);
+        auto fexpr = BDDToFormulaWithPatterns(fchild);
+        result = MergeDefault(var, texpr, fexpr);
+    }
 
-    auto fpo = Cudd_IsComplement(Cudd_E(node)) ? fexpr.pths_zero : fexpr.pths_one;
-    auto fpz = Cudd_IsComplement(Cudd_E(node)) ? fexpr.pths_one : fexpr.pths_zero;
-    auto tpo = texpr.pths_one;
-    auto tpz = texpr.pths_zero;
-
-    int idx = Cudd_NodeReadIndex(node);
-    const auto&[name, bit] = idx_to_var.at(idx);
-    z3::expr var = vars.at(name).is_bool() ? vars.at(name) : vars.at(name).extract(bit, bit) == expr.ctx().bv_val(1, 1);
-    z3::expr neg = vars.at(name).is_bool() ? !vars.at(name) : vars.at(name).extract(bit, bit) == expr.ctx().bv_val(0, 1);
-
-    ApproxExpr result(expr.ctx());
-    tpo.AddConstraint(var);
-    tpz.AddConstraint(var);
-    fpo.AddConstraint(neg);
-    fpz.AddConstraint(neg);
-    result.pths_one = tpo.MergeWith(fpo, max_size);
-    result.pths_zero = tpz.MergeWith(fpz, max_size);
-    approx_expr_cache.emplace(node, result);
+    assert((!isOr(result) && !isAnd(result)) || result.num_args() == 2);
+    expr_cache.emplace(node, result);
     return result;
 }
 
-z3::expr SimplifierThread::BDDToFormulaApprox(const BDD &bdd, std::size_t max_size)
+z3::expr SimplifierThread::BDDToFormula(const BDD &bdd)
 {
-    approx_expr_cache.clear();
+    expr_cache.clear();
     idx_to_var.clear();
-    for (const auto&[name, bvec] : transformer->vars)
+    for (const auto &[name, bvec] : transformer->vars)
     {
         for (int i = 0; i < bvec.bitnum(); ++i)
         {
@@ -224,23 +235,21 @@ z3::expr SimplifierThread::BDDToFormulaApprox(const BDD &bdd, std::size_t max_si
             idx_to_var[idx] = std::make_pair(name, i);
         }
     }
-    ApproxExpr false_expr(expr.ctx());
-    ApproxExpr true_expr(expr.ctx());
-    false_expr.pths_zero.clauses.emplace_back();
-    true_expr.pths_one.clauses.emplace_back();
-    approx_expr_cache.emplace(Cudd_ReadOne(bdd.manager()), true_expr);
-    approx_expr_cache.emplace(Cudd_ReadZero(bdd.manager()), false_expr);
+    expr_cache.emplace(BDDNode{Cudd_ReadOne(bdd.manager()), false}, expr.ctx().bool_val(true));
+    expr_cache.emplace(BDDNode{Cudd_ReadOne(bdd.manager()), true}, expr.ctx().bool_val(false));
+    expr_cache.emplace(BDDNode{Cudd_ReadZero(bdd.manager()), false}, expr.ctx().bool_val(false));
+    expr_cache.emplace(BDDNode{Cudd_ReadZero(bdd.manager()), true}, expr.ctx().bool_val(true));
 
-    const auto& ne = BDDToFormulaApprox(bdd.getRegularNode(), max_size);
+    z3::expr ne(expr.ctx());
+    if (settings.bddtof_pattern)
+        ne = BDDToFormulaWithPatterns({bdd.getRegularNode(), Cudd_IsComplement(bdd.getNode())});
+    else
+        ne = BDDToFormula({bdd.getRegularNode(), Cudd_IsComplement(bdd.getNode())});
+
     if (Solver::resultComputed)
         return expr.ctx().bool_val(false);
 
-    const auto& po = Cudd_IsComplement(bdd.getNode()) ? ne.pths_zero : ne.pths_one;
-    const auto& pz = Cudd_IsComplement(bdd.getNode()) ? ne.pths_one : ne.pths_zero;
-
-    if (overapproximate)
-        return !pz.ToFormula();
-    return po.ToFormula();
+    return ne;
 }
 
 z3::expr SimplifierThread::CollectVars(z3::expr e, int n_bound)
@@ -263,8 +272,9 @@ z3::expr SimplifierThread::CollectVars(z3::expr e, int n_bound)
     if (e.is_const() && !e.is_numeral())
     {
         vars.emplace(e.to_string(), e);
+        return e;
     }
-    
+
     if (e.is_app())
     {
         z3::func_decl f = e.decl();
@@ -294,10 +304,10 @@ z3::expr SimplifierThread::CollectVars(z3::expr e, int n_bound)
 z3::expr SimplifierThread::FixUnder(z3::expr e, int bw)
 {
     std::vector<z3::expr> conj;
-    for (auto&[n, v] : vars)
+    for (auto &[n, v] : vars)
     {
         auto sort = v.get_sort();
-        if (sort.is_bool())
+        if (!sort.is_bv())
             continue;
         auto bits = sort.bv_size();
         if (bits <= bw)
@@ -310,26 +320,12 @@ z3::expr SimplifierThread::FixUnder(z3::expr e, int bw)
     return simplifyAnd(e.ctx(), conj);
 }
 
-z3::expr ApproxDNF::ToFormula() const
+VarRange SimplifierThread::GetNodeVar(DdNode *node)
 {
-    std::vector<z3::expr> clause_formulas;
-    for (const auto& c : clauses)
-        clause_formulas.push_back(simplifyAnd(*ctx, c));
-    return simplifyOr(*ctx, clause_formulas);
-}
-
-void ApproxDNF::AddConstraint(z3::expr e)
-{
-    for (auto& c : clauses)
-        c.push_back(e);
-}
-
-ApproxDNF ApproxDNF::MergeWith(const ApproxDNF &other, std::size_t max_size)
-{
-    assert(ctx == other.ctx);
-    ApproxDNF res(*ctx);
-    std::merge(clauses.begin(), clauses.end(), other.clauses.begin(), other.clauses.end(), std::back_inserter(res.clauses), [&](const auto& a, const auto& b) { return a.size() < b.size(); });
-    if (res.clauses.size() > max_size)
-        res.clauses.resize(max_size);
-    return res;
+    int idx = Cudd_NodeReadIndex(node);
+    if (idx_to_var.find(idx) == idx_to_var.end())
+        return VarRange(expr.ctx());
+    const auto &[name, bit] = idx_to_var.at(idx);
+    z3::expr var = vars.at(name);
+    return VarRange(var, bit, bit);
 }

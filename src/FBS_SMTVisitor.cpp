@@ -10,39 +10,54 @@
 #include "Model.h"
 #include "FormulaSimplifier.h"
 
-const char* hex_char_to_bin(char c)
+const char *hex_char_to_bin(char c)
 {
-    switch(toupper(c))
+    switch (toupper(c))
     {
-        case '0': return "0000";
-        case '1': return "0001";
-        case '2': return "0010";
-        case '3': return "0011";
-        case '4': return "0100";
-        case '5': return "0101";
-        case '6': return "0110";
-        case '7': return "0111";
-        case '8': return "1000";
-        case '9': return "1001";
-        case 'A': return "1010";
-        case 'B': return "1011";
-        case 'C': return "1100";
-        case 'D': return "1101";
-        case 'E': return "1110";
-        case 'F': return "1111";
+    case '0':
+        return "0000";
+    case '1':
+        return "0001";
+    case '2':
+        return "0010";
+    case '3':
+        return "0011";
+    case '4':
+        return "0100";
+    case '5':
+        return "0101";
+    case '6':
+        return "0110";
+    case '7':
+        return "0111";
+    case '8':
+        return "1000";
+    case '9':
+        return "1001";
+    case 'A':
+        return "1010";
+    case 'B':
+        return "1011";
+    case 'C':
+        return "1100";
+    case 'D':
+        return "1101";
+    case 'E':
+        return "1110";
+    case 'F':
+        return "1111";
     }
 }
 
-std::string hex_str_to_bin_str(const std::string& hex)
+std::string hex_str_to_bin_str(const std::string &hex)
 {
     std::string bin;
-    for(unsigned i = 0; i != hex.length(); ++i)
-       bin += hex_char_to_bin(hex[i]);
+    for (unsigned i = 0; i != hex.length(); ++i)
+        bin += hex_char_to_bin(hex[i]);
     return bin;
 }
 
-
-Result FBS_SMTVisitor::Run(SMTLIBv2Parser::ScriptContext* script)
+Result FBS_SMTVisitor::Run(SMTLIBv2Parser::ScriptContext *script)
 {
     asserts.clear();
     asserts.push_back(z3::expr_vector{ctx});
@@ -51,8 +66,7 @@ Result FBS_SMTVisitor::Run(SMTLIBv2Parser::ScriptContext* script)
     return result;
 }
 
-
-void FBS_SMTVisitor::addConstant(const std::string& name, const z3::sort& s)
+void FBS_SMTVisitor::addConstant(const std::string &name, const z3::sort &s)
 {
     if (s.is_bool())
     {
@@ -64,7 +78,7 @@ void FBS_SMTVisitor::addConstant(const std::string& name, const z3::sort& s)
     }
 }
 
-z3::expr FBS_SMTVisitor::addVar(const std::string& name, const z3::sort& s)
+z3::expr FBS_SMTVisitor::addVar(const std::string &name, const z3::sort &s)
 {
     if (s.is_bool())
     {
@@ -82,27 +96,28 @@ z3::expr FBS_SMTVisitor::addVar(const std::string& name, const z3::sort& s)
     exit(1);
 }
 
-void FBS_SMTVisitor::addVarBinding(const std::string& name, const z3::expr& expr)
+void FBS_SMTVisitor::addVarBinding(const std::string &name, const z3::expr &expr)
 {
     variableBindings.push_back({name, expr});
 }
 
-void FBS_SMTVisitor::addFunctionDefinition(const std::string& name, const z3::expr_vector& args, const z3::expr& body)
+void FBS_SMTVisitor::addFunctionDefinition(const std::string &name, const z3::expr_vector &args, const z3::expr &body)
 {
     funDefinitions.insert({name, {args, body}});
 }
 
-void FBS_SMTVisitor::addSortDefinition(const std::string& name,  const z3::sort& sort)
+void FBS_SMTVisitor::addSortDefinition(const std::string &name, const z3::sort &sort)
 {
     sortDefinitions.insert({name, sort});
 }
 
-z3::expr FBS_SMTVisitor::getConstant(const std::string& name) const
+z3::expr FBS_SMTVisitor::getConstant(const std::string &name) const
 {
     auto varItem = std::find_if(
         variables.rbegin(),
         variables.rend(),
-        [name] (const auto& it) { return it.first == name; });
+        [name](const auto &it)
+        { return it.first == name; });
 
     if (varItem != variables.rend())
     {
@@ -118,7 +133,8 @@ z3::expr FBS_SMTVisitor::getConstant(const std::string& name) const
     auto bindItem = std::find_if(
         variableBindings.rbegin(),
         variableBindings.rend(),
-        [name] (const auto& it) { return it.first == name; });
+        [name](const auto &it)
+        { return it.first == name; });
 
     if (bindItem != variableBindings.rend())
     {
@@ -129,10 +145,12 @@ z3::expr FBS_SMTVisitor::getConstant(const std::string& name) const
     exit(1);
 }
 
-
-antlrcpp::Any FBS_SMTVisitor::visitCommand(SMTLIBv2Parser::CommandContext* command)
+antlrcpp::Any FBS_SMTVisitor::visitCommand(SMTLIBv2Parser::CommandContext *command)
 {
-    if (exited) { return antlrcpp::Any{}; }
+    if (exited)
+    {
+        return antlrcpp::Any{};
+    }
 
     if (command->cmd_setLogic())
     {
@@ -146,7 +164,7 @@ antlrcpp::Any FBS_SMTVisitor::visitCommand(SMTLIBv2Parser::CommandContext* comma
     else if (command->cmd_echo())
     {
         std::string str = command->string()->getText();
-        std::cout << str.substr(1, str.size()-2) << std::endl;
+        std::cout << str.substr(1, str.size() - 2) << std::endl;
     }
     else if (command->cmd_exit())
     {
@@ -161,7 +179,7 @@ antlrcpp::Any FBS_SMTVisitor::visitCommand(SMTLIBv2Parser::CommandContext* comma
         }
         else if (info->PK_AssertionStackLevels())
         {
-            std::cout << "(:assertion-stack-levels " << (asserts.size() - 1) <<  ")" << std::endl;
+            std::cout << "(:assertion-stack-levels " << (asserts.size() - 1) << ")" << std::endl;
         }
         else if (info->PK_ErrorBehaviour())
         {
@@ -185,7 +203,7 @@ antlrcpp::Any FBS_SMTVisitor::visitCommand(SMTLIBv2Parser::CommandContext* comma
         auto option = command->option();
         if (option->PK_DiagnosticOutputChannel())
         {
-            //TODO
+            // TODO
         }
         else if (option->PK_PrintSuccess())
         {
@@ -197,7 +215,7 @@ antlrcpp::Any FBS_SMTVisitor::visitCommand(SMTLIBv2Parser::CommandContext* comma
         }
         else if (option->PK_RegularOutputChannel())
         {
-            //TODO
+            // TODO
         }
         else if (option->PK_Verbosity())
         {
@@ -213,7 +231,7 @@ antlrcpp::Any FBS_SMTVisitor::visitCommand(SMTLIBv2Parser::CommandContext* comma
         auto option = command->keyword()->predefKeyword();
         if (option->PK_DiagnosticOutputChannel())
         {
-            //TODO
+            // TODO
         }
         else if (option->PK_PrintSuccess())
         {
@@ -225,7 +243,7 @@ antlrcpp::Any FBS_SMTVisitor::visitCommand(SMTLIBv2Parser::CommandContext* comma
         }
         else if (option->PK_RegularOutputChannel())
         {
-            //TODO
+            // TODO
         }
         else if (option->PK_Verbosity())
         {
@@ -238,7 +256,7 @@ antlrcpp::Any FBS_SMTVisitor::visitCommand(SMTLIBv2Parser::CommandContext* comma
     }
     else if (command->cmd_setInfo())
     {
-        //TODO: save :status and check its value after solving
+        // TODO: save :status and check its value after solving
     }
     else if (command->cmd_declareFun())
     {
@@ -308,15 +326,14 @@ antlrcpp::Any FBS_SMTVisitor::visitCommand(SMTLIBv2Parser::CommandContext* comma
     else if (command->cmd_checkSat())
     {
         z3::expr_vector ev(ctx);
-        for(const auto& assert : asserts)
+        for (const auto &assert : asserts)
         {
-            for (const auto& x : assert)
+            for (const auto &x : assert)
                 ev.push_back(x);
         }
         auto expr = ev.size() == 1 ? ev[0] : z3::mk_and(ev);
         logger.DumpFormula("in.smt2", expr);
-        logger.DumpFormula("out.smt2", expr);
-        
+
         FormulaSimplifier fs(expr);
         auto new_expr = fs.Run();
 
@@ -329,11 +346,11 @@ antlrcpp::Any FBS_SMTVisitor::visitCommand(SMTLIBv2Parser::CommandContext* comma
     else if (command->cmd_getValue())
     {
         std::cout << "(" << std::endl;
-        for (const auto& t : command->term())
+        for (const auto &t : command->term())
         {
             z3::expr termExpr = std::any_cast<z3::expr>(visitTerm(t));
             z3::expr value = substituteModel(termExpr, model).simplify();
-            std::cout << "  (" <<  termExpr << " " << value << ")" << std::endl;
+            std::cout << "  (" << termExpr << " " << value << ")" << std::endl;
         }
         std::cout << ")" << std::endl;
     }
@@ -351,7 +368,7 @@ antlrcpp::Any FBS_SMTVisitor::visitCommand(SMTLIBv2Parser::CommandContext* comma
     return antlrcpp::Any{};
 }
 
-antlrcpp::Any FBS_SMTVisitor::visitSort(SMTLIBv2Parser::SortContext* sort)
+antlrcpp::Any FBS_SMTVisitor::visitSort(SMTLIBv2Parser::SortContext *sort)
 {
     if (auto ident = sort->identifier())
     {
@@ -378,12 +395,12 @@ antlrcpp::Any FBS_SMTVisitor::visitSort(SMTLIBv2Parser::SortContext* sort)
     return antlrcpp::Any{};
 }
 
-antlrcpp::Any FBS_SMTVisitor::visitSorted_var(SMTLIBv2Parser::Sorted_varContext* sv)
+antlrcpp::Any FBS_SMTVisitor::visitSorted_var(SMTLIBv2Parser::Sorted_varContext *sv)
 {
     return addVar(sv->symbol()->getText(), std::any_cast<z3::sort>(visitSort(sv->sort())));
 }
 
-antlrcpp::Any FBS_SMTVisitor::visitVar_binding(SMTLIBv2Parser::Var_bindingContext* sv)
+antlrcpp::Any FBS_SMTVisitor::visitVar_binding(SMTLIBv2Parser::Var_bindingContext *sv)
 {
     addVarBinding(sv->symbol()->getText(), std::any_cast<z3::expr>(visitTerm(sv->term())));
     return antlrcpp::Any{};
@@ -394,7 +411,7 @@ antlrcpp::Any FBS_SMTVisitor::visitBinary(SMTLIBv2Parser::BinaryContext *b)
     std::string bitString = b->getText().substr(2);
     bool bits[bitString.size()];
     int i = bitString.size();
-    for (auto& bd : bitString)
+    for (auto &bd : bitString)
     {
         i--;
         bits[i] = bd == '0' ? false : true;
@@ -407,7 +424,7 @@ antlrcpp::Any FBS_SMTVisitor::visitHexadecimal(SMTLIBv2Parser::HexadecimalContex
     std::string bitString = hex_str_to_bin_str(b->getText().substr(2));
     bool bits[bitString.size()];
     int i = bitString.size();
-    for (auto& bd : bitString)
+    for (auto &bd : bitString)
     {
         i--;
         bits[i] = bd == '0' ? false : true;
@@ -420,7 +437,7 @@ antlrcpp::Any FBS_SMTVisitor::visitFunction_def(SMTLIBv2Parser::Function_defCont
     std::string name = fd->symbol()->getText();
 
     z3::expr_vector args(ctx);
-    for (auto& sv : fd->sorted_var())
+    for (auto &sv : fd->sorted_var())
     {
         args.push_back(std::any_cast<z3::expr>(visitSorted_var(sv)));
     }
@@ -431,23 +448,23 @@ antlrcpp::Any FBS_SMTVisitor::visitFunction_def(SMTLIBv2Parser::Function_defCont
     return antlrcpp::Any{};
 }
 
-z3::expr FBS_SMTVisitor::applyDefinedFunction(const std::string& name, const z3::expr_vector& args)
+z3::expr FBS_SMTVisitor::applyDefinedFunction(const std::string &name, const z3::expr_vector &args)
 {
     auto [funArgs, body] = funDefinitions.at(name);
     return body.substitute(funArgs, args);
 }
 
-bool FBS_SMTVisitor::isDefinedFunction(const std::string& name)
+bool FBS_SMTVisitor::isDefinedFunction(const std::string &name)
 {
     return funDefinitions.find(name) != funDefinitions.end();
 }
 
-bool FBS_SMTVisitor::isDefinedSort(const std::string& name)
+bool FBS_SMTVisitor::isDefinedSort(const std::string &name)
 {
     return sortDefinitions.find(name) != sortDefinitions.end();
 }
 
-antlrcpp::Any FBS_SMTVisitor::visitTerm(SMTLIBv2Parser::TermContext* term)
+antlrcpp::Any FBS_SMTVisitor::visitTerm(SMTLIBv2Parser::TermContext *term)
 {
     if (auto sc = term->spec_constant())
     {
@@ -464,7 +481,7 @@ antlrcpp::Any FBS_SMTVisitor::visitTerm(SMTLIBv2Parser::TermContext* term)
     if (term->GRW_Forall())
     {
         z3::expr_vector bound(ctx);
-        for (auto& sv : term->sorted_var())
+        for (auto &sv : term->sorted_var())
         {
             bound.push_back(std::any_cast<z3::expr>(visitSorted_var(sv)));
         }
@@ -481,7 +498,7 @@ antlrcpp::Any FBS_SMTVisitor::visitTerm(SMTLIBv2Parser::TermContext* term)
     if (term->GRW_Exists())
     {
         z3::expr_vector bound(ctx);
-        for (auto& sv : term->sorted_var())
+        for (auto &sv : term->sorted_var())
         {
             bound.push_back(std::any_cast<z3::expr>(visitSorted_var(sv)));
         }
@@ -500,7 +517,7 @@ antlrcpp::Any FBS_SMTVisitor::visitTerm(SMTLIBv2Parser::TermContext* term)
 
     if (term->GRW_Let())
     {
-        for (auto& vb : term->var_binding())
+        for (auto &vb : term->var_binding())
         {
             visitVar_binding(vb);
         }
@@ -516,7 +533,7 @@ antlrcpp::Any FBS_SMTVisitor::visitTerm(SMTLIBv2Parser::TermContext* term)
     auto subtermContexts = term->term();
     z3::expr_vector subterms(ctx);
 
-    for( auto& stc : subtermContexts)
+    for (auto &stc : subtermContexts)
     {
         subterms.push_back(std::any_cast<z3::expr>(visitTerm(stc)));
     }
@@ -598,13 +615,17 @@ antlrcpp::Any FBS_SMTVisitor::visitTerm(SMTLIBv2Parser::TermContext* term)
         }
         else if (identName == "distinct")
         {
-            if (subterms[0].get_sort().is_bool()) {
-                if (subterms.size() != 2) {
+            if (subterms[0].get_sort().is_bool())
+            {
+                if (subterms.size() != 2)
+                {
                     std::cout << "Unsupported Boolean distinct of arity > 2" << std::endl;
                     exit(1);
                 }
                 return !(subterms[0] == subterms[1]);
-            } else {
+            }
+            else
+            {
                 return z3::distinct(subterms);
             }
         }

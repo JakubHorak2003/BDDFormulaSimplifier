@@ -21,7 +21,7 @@ z3::expr FormulaSimplifier::Run()
 {
     auto out = RunSimplifications();
     logger.DumpFormula("out.smt2", out);
-    for (auto& t : threads)
+    for (auto &t : threads)
         t.WaitForResult();
     return out;
 }
@@ -33,7 +33,6 @@ z3::expr FormulaSimplifier::RunSimplifications()
     expr = simplifier.Simplify(expr);
     expr = RemoveInternal(expr);
     logger.DumpFormula("simplified.smt2", expr);
-    logger.DumpFormula("out.smt2", expr);
 
     std::vector<int> quant_cnts;
     CountQuantifiers(expr, 0, quant_cnts);
@@ -49,16 +48,18 @@ z3::expr FormulaSimplifier::RunSimplifications()
     threads.emplace_back(expr, false, bound);
     logger.Log(std::to_string(threads.size()) + " threads launched");
 
-    while (!std::all_of(threads.begin(), threads.end(), [](const auto& t) { return t.IsFinished(); }) && !time_manager.IsTimeout())
+    while (!std::all_of(threads.begin(), threads.end(), [](const auto &t)
+                        { return t.IsFinished(); }) &&
+           !time_manager.IsTimeout())
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     Solver::resultComputed = true;
     if (time_manager.IsTimeout())
         logger.Log("Timeout");
-    
+
     z3::expr res(expr.ctx()), expr_o(expr.ctx()), expr_u(expr.ctx());
-    
-    auto& tu = threads.back();
+
+    auto &tu = threads.back();
     logger.Log("Getting result from main thread");
     auto under = Translate(tu.GetResult(), expr.ctx());
     if (!under.empty())
@@ -70,7 +71,7 @@ z3::expr FormulaSimplifier::RunSimplifications()
     {
         auto t_curr = threads.begin();
         res = Simplify(expr, depth, t_curr, true, true, 2);
-    
+
         if (settings.use_over && settings.use_under)
         {
             t_curr = threads.begin();
@@ -78,9 +79,9 @@ z3::expr FormulaSimplifier::RunSimplifications()
             t_curr = threads.begin();
             expr_u = Simplify(expr, depth, t_curr, false, true, 2);
         }
-    
-        assert(std::next(t_curr) == threads.end());    
-    }    
+
+        assert(std::next(t_curr) == threads.end());
+    }
 
     if (settings.use_over && settings.use_under)
     {
@@ -91,7 +92,7 @@ z3::expr FormulaSimplifier::RunSimplifications()
     return res;
 }
 
-z3::expr FormulaSimplifier::Simplify(z3::expr e, int depth, std::list<SimplifierThread>::iterator& t_curr, bool use_over, bool use_under, int n_approx_pick)
+z3::expr FormulaSimplifier::Simplify(z3::expr e, int depth, std::list<SimplifierThread>::iterator &t_curr, bool use_over, bool use_under, int n_approx_pick)
 {
     if (e.is_const() || !e.is_bool())
     {
@@ -147,17 +148,17 @@ z3::expr FormulaSimplifier::Simplify(z3::expr e, int depth, std::list<Simplifier
             logger.Log("Getting result from thread");
             if (settings.use_under)
             {
-                auto& tu = *t_curr++;
+                auto &tu = *t_curr++;
                 auto under = Translate(tu.GetResult(), e.ctx());
                 if (use_under)
-                    e = simplifyOr(e.ctx(), {simplifyOr(e.ctx(), PickResults(under, n_approx_pick)), e});
+                    e = simplifyOr(simplifyOr(e.ctx(), PickResults(under, n_approx_pick)), e);
             }
             if (settings.use_over)
             {
-                auto& to = *t_curr++;
+                auto &to = *t_curr++;
                 auto over = Translate(to.GetResult(), e.ctx());
                 if (use_over)
-                    e = simplifyAnd(e.ctx(), {simplifyAnd(e.ctx(), PickResults(over, n_approx_pick)), e});
+                    e = simplifyAnd(simplifyAnd(e.ctx(), PickResults(over, n_approx_pick)), e);
             }
         }
     }
@@ -165,7 +166,7 @@ z3::expr FormulaSimplifier::Simplify(z3::expr e, int depth, std::list<Simplifier
     return e;
 }
 
-void FormulaSimplifier::LaunchThreads(z3::expr e, int depth, std::vector<z3::expr>& bound)
+void FormulaSimplifier::LaunchThreads(z3::expr e, int depth, std::vector<z3::expr> &bound)
 {
     if (e.is_const() || !e.is_bool())
     {

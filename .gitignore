@@ -4,3 +4,6 @@ src/*.smt2
 src/*.dot
 src/*.txt
 out.csv
+src/__pycache__
+src/tmp*
+.vscode

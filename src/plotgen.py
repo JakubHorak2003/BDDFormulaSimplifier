@@ -8,6 +8,8 @@ def get_data(data, durs, tool):
             tm = durs[b][tool]
             if tool.startswith('myapp'):
                 tm += durs[b]['myapp']
+            if tool.startswith('PAT_myapp'):
+                tm += durs[b]['PAT_myapp']
             x.append(min(60, tm / 1000))
     x.sort()
     y = list(range(1, len(x) + 1))
@@ -17,7 +19,8 @@ def get_data(data, durs, tool):
 def main():
     data = {}
     durs = {}
-    load_v2('results_v8_20_40_complete.txt', ['myapp', 'z3_sg', 'q3b_sg', 'cvc5_sg', 'bitw_sg'] + [f'myapp_sg_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
+    load_v2('results_60s_sg_new.txt', ['myapp', 'z3_sg', 'q3b_sg', 'cvc5_sg', 'bitw_sg'] + [f'myapp_sg_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
+    load_v2('results_60s_sg_pat.txt', ['PAT_myapp', '', '', '', ''] + [f'PAT_myapp_sg_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
 
     to_pop = []
     for b in data.keys():
@@ -29,8 +32,8 @@ def main():
         durs.pop(b)
 
     plt.figure(figsize=(8, 5))
-    for t, l in zip(['q3b_sg', 'bitw_sg', 'myapp_sg_20+bitw_40'], ['Q3B', 'Bitwuzla', 'FBS(20)+Bitwuzla']):
-        plt.step(*get_data(data, durs, t), where='post', label=l)
+    for t in ['myapp_sg_20+cvc5_40', 'PAT_myapp_sg_20+cvc5_40']:
+        plt.step(*get_data(data, durs, t), where='post', label=t)
     plt.xlabel('Time (s)')
     plt.ylabel('Non-trivial benchmarks solved')
     plt.legend()

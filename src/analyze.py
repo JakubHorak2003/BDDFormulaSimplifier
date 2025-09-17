@@ -32,9 +32,15 @@ def add_tool(dct, subtools):
     dct[name] = result
 
 def augment_tools(dct):
+    # keys= list(dct.keys())
+    # for k1 in keys:
+    #     for k2 in keys:
+    #         if k1 < k2:
+    #             add_tool
     pass
-    # add_tool(dct, ['q3b_60', 'bitw_60'])
-    # add_tool(dct, ['myapp_20+bitw_40', 'bitw_60'])
+    # add_tool(dct, ['q3b_300', 'bitw_300'])
+    # add_tool(dct, ['fbs_pat_100+bitw_200', 'bitw_300'])
+
     # for t in SECONDARY_TOOLS:
     #     vt = [f'{t}_60'] + [f'myapp_{x}+{t}_{60-x}' for x in [10, 20, 30]]
     #     dct[f'vbs_{t}'] = combine_results([dct[x] for x in vt])
@@ -74,8 +80,26 @@ def load_v2(filename, tool_names, res, durs=None):
                     except ValueError:
                         print('ERROR', line)
 
+COMPARE = ['fbs_pat_100+bitw_200', 'fbs_100+bitw_200']
+# COMPARE = ['fbs_pat_20+bitw_40', 'bitw_300']
+
+def analyze_durs(data, durs, tools):
+    sm = {t:0.0 for t in tools}
+    tot = 0
+    for bench in data.keys():
+        if any(t not in data[bench] or data[bench][t] == 'timeout' for t in tools):
+            continue
+        tot += 1
+        for t in tools:
+            sm[t] += durs[bench][t]
+
+    for t in tools:
+        sm[t] /= tot
+    print(tot, sm)
+
 def main():
     data = {}
+    durs = {}
     # load('results_v5_fixaff_over.txt', ['', 'new_myapp_over+z3', 'new_myapp_over+cvc5', 'new_myapp_over+bitw'], data)
     # load('results_v5.txt', ['q3b', ''] + SECONDARY_TOOLS + ['myapp_'+t for t in SECONDARY_TOOLS] + ['myappover_'+t for t in SECONDARY_TOOLS] + ['myappunder_'+t for t in SECONDARY_TOOLS], data)
     # load('results_v5_lim_thr.txt', ['', '', '2_new_myapp_over(2)+bitw'], data)
@@ -86,22 +110,30 @@ def main():
     # load('results.txt', ['', 'myapp+bitw'], data)
     
     # load('results_v6.txt', ['', 'z3_v6', 'q3b_v6', 'cvc5_v6', 'bitw_v6'] + ['dump_' + t for t in SECONDARY_TOOLS] + ['simpl_' + t for t in SECONDARY_TOOLS] + ['myapp_' + t + '_v6' for t in SECONDARY_TOOLS], data)
-    load('results_v6_10_50.txt', ['', 'z3_60', 'q3b_60', 'cvc5_60', 'bitw_60'], data)
+    #load('results_v6_10_50.txt', ['', 'z3_60', 'q3b_60', 'cvc5_60', 'bitw_60'], data)
     # load('results_v6_20_40.txt', ['', '', 'z3', 'q3b', 'cvc5', 'bitw'] + ['myapp+' + t for t in SECONDARY_TOOLS], data)
-    load('results_v7_20_40.txt', ['', ''] + [f'myapp_20+{t}_40' for t in SECONDARY_TOOLS], data)
-    load('results_v7_30_30.txt', ['', ''] + [f'myapp_30+{t}_30' for t in SECONDARY_TOOLS], data)
-    load('results_v7_10_50.txt', ['', ''] + [f'myapp_10+{t}_50' for t in SECONDARY_TOOLS], data)
+    #load('results_v7_20_40.txt', ['', ''] + [f'myapp_20+{t}_40' for t in SECONDARY_TOOLS], data)
+    #load('results_v7_30_30.txt', ['', ''] + [f'myapp_30+{t}_30' for t in SECONDARY_TOOLS], data)
+    #load('results_v7_10_50.txt', ['', ''] + [f'myapp_10+{t}_50' for t in SECONDARY_TOOLS], data)
     # load_v2('results_v8_20_40.txt', ['', 'z3_sg', 'q3b_sg', 'cvc5_sg', 'bitw_sg'] + [f'myapp_sg_20+{t}_40' for t in SECONDARY_TOOLS], data)
-    # load_v2('results.txt', ['', 'z3_sg', 'q3b_sg', 'cvc5_sg', 'bitw_sg'] + [f'myapp_sg_20+{t}_40' for t in SECONDARY_TOOLS], data)
+    # load_v2('results_60s_sg.txt', ['', 'OLD_z3_sg', 'OLD_q3b_sg', 'OLD_cvc5_sg', 'OLD_bitw_sg'] + [f'OLD_myapp_sg_20+{t}_40' for t in SECONDARY_TOOLS], data)
+    # load_v2('results_60s_sg_new.txt', ['', 'z3_60', 'q3b_60', 'cvc5_60', 'bitw_60'] + [f'fbs_20+{t}_40' for t in SECONDARY_TOOLS], data)
+    # load_v2('results_60s_sg_pattern.txt', ['', 'PAT_z3_sg', 'PAT_q3b_sg', 'PAT_cvc5_sg', 'PAT_bitw_sg'] + [f'PAT_myapp_sg_20+{t}_40' for t in SECONDARY_TOOLS], data)
+    load_v2('results_60s_sg_pat.txt', ['', '', '', '', ''] + [f'fbs_pat_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
+    load_v2('results.txt', ['', 'z3_300', 'q3b_300', 'cvc5_300', 'bitw_300'] + [f'fbs_100+{t}_200' for t in SECONDARY_TOOLS], data, durs)
+    load_v2('results_300s_sg_pat.txt', ['', 'z3_300', 'q3b_300', 'cvc5_300', 'bitw_300'] + [f'fbs_pat_100+{t}_200' for t in SECONDARY_TOOLS], data, durs)
+    # load_v2('results_300s_sg_pat_20+280.txt', ['', '', '', '', ''] + [f'fbs_pat_20+{t}_280' for t in SECONDARY_TOOLS], data)
 
     # load('results_v6_10_50.txt', ['', '', 'q3b', '', 'bitw'], data)
     # load('results_v7_20_40.txt', ['', ''] + ['fbs' if t == 'bitw' else '' for t in SECONDARY_TOOLS], data)
 
+    analyze_durs(data, durs, ['bitw_300', 'fbs_pat_100+bitw_200', 'fbs_100+bitw_200'])
+
     all_tools = list(next(iter(data.values())).keys())
-    for i in range(315):
-        data[f'sat{i}'] = {t:'sat' for t in all_tools}
-    for i in range(4603):
-        data[f'unsat{i}'] = {t:'unsat' for t in all_tools}
+    # for i in range(315):
+    #     data[f'sat{i}'] = {t:'sat' for t in all_tools}
+    # for i in range(4603):
+    #     data[f'unsat{i}'] = {t:'unsat' for t in all_tools}
 
     with open('out.csv', 'w') as file:
         keys = list(next(iter(data.values())).keys())
@@ -114,6 +146,7 @@ def main():
     unsat_perf = defaultdict(int)
 
     myapp_only = 0
+    better = worse = 0
 
     rerun = []
     diff = 0
@@ -126,6 +159,9 @@ def main():
         all_res = set(results_dct.values())
         if {'sat', 'unsat'} <= all_res:
             print('Conflict found', benchmark)
+            continue
+
+        if 'fbs_100+z3_200' not in results_dct:
             continue
         
         bench_res = 'sat' if 'sat' in all_res else 'unsat' if 'unsat' in all_res else 'unknown'
@@ -160,7 +196,14 @@ def main():
         total_perf['total'] += 1
         by_res_perf['total'] += 1
 
-        if solved_tools and all('myapp' in t or t == 'total solved' for t in solved_tools):
+        if COMPARE[1] not in solved_tools and COMPARE[0] in solved_tools:
+            print('BETTER', benchmark)
+            better += 1
+        if COMPARE[1] in solved_tools and COMPARE[0] not in solved_tools:
+            print('WORSE', benchmark)
+            worse += 1
+
+        if solved_tools and all('fbs' in t or t == 'total solved' for t in solved_tools):
             print('MYAPP', benchmark, bench_res, solved_tools)
             myapp_only += 1
 
@@ -176,7 +219,8 @@ def main():
     print_stats(unsat_perf)
 
     print('My app only:', myapp_only)
-    print('Diff:', diff)
+    print('Better:', better)
+    print('Worse:', worse)
 
     print(myapp_stats)
 

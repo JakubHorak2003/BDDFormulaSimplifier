@@ -28,4 +28,4 @@ exclude_txt = 'bench.txt'
 filtered_txt = 'bench_rem.txt'
 
 list_smt2_files(base_directory, all_files_txt)
-remove_excluded_files(all_files_txt, exclude_txt, filtered_txt)
+#remove_excluded_files(all_files_txt, exclude_txt, filtered_txt)

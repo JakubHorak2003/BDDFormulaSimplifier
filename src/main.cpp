@@ -19,7 +19,7 @@
 
 using namespace antlr4;
 
-void PrintUsage(const char* argv0)
+void PrintUsage(const char *argv0)
 {
     std::cout << "Usage: " << argv0 << " [options] filename.smt2\n";
     std::cout << "Available options:\n";
@@ -28,10 +28,34 @@ void PrintUsage(const char* argv0)
     std::cout << "    --use-over:[1/0] whether to use overapproximations, default 1\n";
     std::cout << "    --use-under:[1/0] whether to use underapproximations, default 0\n";
     std::cout << "    --max-quants:n maximum number of quantifiers, 0 for no limit, default 0\n";
+    std::cout << "    --bddtof-pattern:[1/0] enable pattern detection in BDD to formula conversion if 1, default 1\n";
+    std::cout << "    --dump-bdds:[1/0] save all computed bdds as .dot files if 1, default 0\n";
 }
 
-int main(int argc, char** argv) 
+int main(int argc, char **argv)
 {
+    z3::set_param("pp.max_depth", "4294967295");
+    z3::set_param("pp.max_width", "4294967295");
+    z3::set_param("pp.max_ribbon", "4294967295");
+    z3::set_param("pp.single_line", "true");
+
+    // logger.SetEnabled(true);
+    // z3::context c;
+    // auto x = c.bv_const("x", 13);
+    // auto y = c.bv_const("y", 13);
+    // auto a = c.bv_const("a", 13);
+    // auto b = c.bv_const("b", 13);
+    // auto w = c.bv_const("w", 13);
+    // auto d = c.bv_const("d", 13);
+    // auto e = (x | y) == 3546;
+    // // auto e = z3::forall(y, x * y == c.bv_val(0, 10));
+    // // settings.bddtof_pattern = false;
+    // logger.DumpFormula("in.smt2", e);
+    // SimplifierThread st(e, true, {});
+    // st.WaitForResult();
+    // logger.DumpFormula("out.smt2", st.GetResult().back());
+    // exit(0);
+
     if (argc < 2)
     {
         PrintUsage(argv[0]);
@@ -61,6 +85,14 @@ int main(int argc, char** argv)
         {
             settings.max_quants = x;
         }
+        else if (sscanf(argv[i], "--bddtof-pattern:%d", &x) == 1 && x >= 0 && x <= 1)
+        {
+            settings.bddtof_pattern = (bool)x;
+        }
+        else if (sscanf(argv[i], "--dump-bdds:%d", &x) == 1 && x >= 0 && x <= 1)
+        {
+            settings.dump_bdds = (bool)x;
+        }
         else
         {
             PrintUsage(argv[0]);
@@ -83,11 +115,10 @@ int main(int argc, char** argv)
     CommonTokenStream tokens(&lexer);
     SMTLIBv2Parser parser(&tokens);
 
-    SMTLIBv2Parser::StartContext* tree = parser.start();
+    SMTLIBv2Parser::StartContext *tree = parser.start();
 
     Config config;
     FBS_SMTVisitor interpreter;
     interpreter.SetConfig(config);
     interpreter.Run(tree->script());
 }
-

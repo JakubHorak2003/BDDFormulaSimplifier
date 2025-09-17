@@ -19,7 +19,7 @@ target_include_directories(q3b_includes INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/external/q3b/lib
 )
 
-add_executable(fbs src/main.cpp src/FBS_SMTVisitor.cpp src/FormulaSimplifier.cpp src/FBSLogger.cpp src/SimplifierThread.cpp src/SimplifierBasic.cpp src/TimeoutManager.cpp src/Settings.cpp)
+add_executable(fbs src/main.cpp src/FBS_SMTVisitor.cpp src/FormulaSimplifier.cpp src/FBSLogger.cpp src/SimplifierThread.cpp src/SimplifierBasic.cpp src/TimeoutManager.cpp src/Settings.cpp src/ExprManip.cpp src/Pattern.cpp)
 
 target_link_libraries(fbs PRIVATE q3blib q3b_includes)
 
