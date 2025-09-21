@@ -30,6 +30,7 @@ void PrintUsage(const char *argv0)
     std::cout << "    --max-quants:n maximum number of quantifiers, 0 for no limit, default 0\n";
     std::cout << "    --bddtof-pattern:[1/0] enable pattern detection in BDD to formula conversion if 1, default 1\n";
     std::cout << "    --dump-bdds:[1/0] save all computed bdds as .dot files if 1, default 0\n";
+    std::cout << "    --simplify-whole:[1/0] whether to simplify the whole formula (1) or only the processed subformulas (0), default 0\n";
 }
 
 int main(int argc, char **argv)
@@ -92,6 +93,10 @@ int main(int argc, char **argv)
         else if (sscanf(argv[i], "--dump-bdds:%d", &x) == 1 && x >= 0 && x <= 1)
         {
             settings.dump_bdds = (bool)x;
+        }
+        else if (sscanf(argv[i], "--simplify-whole:%d", &x) == 1 && x >= 0 && x <= 1)
+        {
+            settings.simplify_whole_formula = (bool)x;
         }
         else
         {

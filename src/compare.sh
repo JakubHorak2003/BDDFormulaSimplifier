@@ -16,7 +16,7 @@ RESULTS_FILE="results.txt"
 
 echo "Using cores $THREAD_0 and $THREAD_1"
 
-MYAPP_CMD="taskset -c $THREAD_0 ../../build/fbs2 --bddtof-pattern:0"
+MYAPP_CMD="taskset -c $THREAD_0 ../../build/fbs2"
 Z3_CMD="z3"
 Q3B_CMD="taskset -c $THREAD_1 ../../build/external/q3b/q3b"
 CVC5_CMD="cvc5"

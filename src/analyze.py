@@ -80,7 +80,7 @@ def load_v2(filename, tool_names, res, durs=None):
                     except ValueError:
                         print('ERROR', line)
 
-COMPARE = ['fbs_pat_100+bitw_200', 'fbs_100+bitw_200']
+COMPARE = ['fbs_pat_ss_20+bitw_40', 'fbs_pat_20+bitw_40']
 # COMPARE = ['fbs_pat_20+bitw_40', 'bitw_300']
 
 def analyze_durs(data, durs, tools):
@@ -119,15 +119,16 @@ def main():
     # load_v2('results_60s_sg.txt', ['', 'OLD_z3_sg', 'OLD_q3b_sg', 'OLD_cvc5_sg', 'OLD_bitw_sg'] + [f'OLD_myapp_sg_20+{t}_40' for t in SECONDARY_TOOLS], data)
     # load_v2('results_60s_sg_new.txt', ['', 'z3_60', 'q3b_60', 'cvc5_60', 'bitw_60'] + [f'fbs_20+{t}_40' for t in SECONDARY_TOOLS], data)
     # load_v2('results_60s_sg_pattern.txt', ['', 'PAT_z3_sg', 'PAT_q3b_sg', 'PAT_cvc5_sg', 'PAT_bitw_sg'] + [f'PAT_myapp_sg_20+{t}_40' for t in SECONDARY_TOOLS], data)
-    load_v2('results_60s_sg_pat.txt', ['', '', '', '', ''] + [f'fbs_pat_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
-    load_v2('results.txt', ['', 'z3_300', 'q3b_300', 'cvc5_300', 'bitw_300'] + [f'fbs_100+{t}_200' for t in SECONDARY_TOOLS], data, durs)
-    load_v2('results_300s_sg_pat.txt', ['', 'z3_300', 'q3b_300', 'cvc5_300', 'bitw_300'] + [f'fbs_pat_100+{t}_200' for t in SECONDARY_TOOLS], data, durs)
+    load_v2('results.txt', ['', '', '', '', ''] + [f'fbs_pat_ss_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
+    load_v2('results_60s_sg_pat.txt', ['', 'z3_60', 'q3b_60', 'cvc5_60', 'bitw_60'] + [f'fbs_pat_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
+    # load_v2('results.txt', ['', 'z3_300', 'q3b_300', 'cvc5_300', 'bitw_300'] + [f'fbs_100+{t}_200' for t in SECONDARY_TOOLS], data, durs)
+    # load_v2('results_300s_sg_pat.txt', ['', 'z3_300', 'q3b_300', 'cvc5_300', 'bitw_300'] + [f'fbs_pat_100+{t}_200' for t in SECONDARY_TOOLS], data, durs)
     # load_v2('results_300s_sg_pat_20+280.txt', ['', '', '', '', ''] + [f'fbs_pat_20+{t}_280' for t in SECONDARY_TOOLS], data)
 
     # load('results_v6_10_50.txt', ['', '', 'q3b', '', 'bitw'], data)
     # load('results_v7_20_40.txt', ['', ''] + ['fbs' if t == 'bitw' else '' for t in SECONDARY_TOOLS], data)
 
-    analyze_durs(data, durs, ['bitw_300', 'fbs_pat_100+bitw_200', 'fbs_100+bitw_200'])
+    # analyze_durs(data, durs, ['bitw_300', 'fbs_pat_100+bitw_200', 'fbs_100+bitw_200'])
 
     all_tools = list(next(iter(data.values())).keys())
     # for i in range(315):
@@ -150,6 +151,7 @@ def main():
 
     rerun = []
     diff = 0
+    conflicts = 0
 
     myapp_stats = defaultdict(lambda: [0] * 8)
 
@@ -159,9 +161,10 @@ def main():
         all_res = set(results_dct.values())
         if {'sat', 'unsat'} <= all_res:
             print('Conflict found', benchmark)
+            conflicts += 1
             continue
 
-        if 'fbs_100+z3_200' not in results_dct:
+        if 'fbs_pat_ss_20+bitw_40' not in results_dct:
             continue
         
         bench_res = 'sat' if 'sat' in all_res else 'unsat' if 'unsat' in all_res else 'unknown'
@@ -197,10 +200,10 @@ def main():
         by_res_perf['total'] += 1
 
         if COMPARE[1] not in solved_tools and COMPARE[0] in solved_tools:
-            print('BETTER', benchmark)
+            print('BETTER', bench_res, benchmark)
             better += 1
         if COMPARE[1] in solved_tools and COMPARE[0] not in solved_tools:
-            print('WORSE', benchmark)
+            print('WORSE', bench_res, benchmark)
             worse += 1
 
         if solved_tools and all('fbs' in t or t == 'total solved' for t in solved_tools):
@@ -221,6 +224,7 @@ def main():
     print('My app only:', myapp_only)
     print('Better:', better)
     print('Worse:', worse)
+    print('Conflicts:', conflicts)
 
     print(myapp_stats)
 

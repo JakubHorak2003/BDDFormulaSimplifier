@@ -1,4 +1,5 @@
 #include <iostream>
+#include <sstream>
 
 #include "SimplifierThread.h"
 #include "SimplifierBasic.h"
@@ -7,6 +8,7 @@
 #include "Pattern.h"
 
 #include "Solver.h"
+#include "ExprSimplifier.h"
 
 z3::expr Translate(z3::expr e, z3::context &ctx)
 {
@@ -42,9 +44,73 @@ z3::expr_vector GetQuantBoundVars(z3::expr e)
     return res;
 }
 
+z3::expr RemoveInternal(z3::expr e)
+{
+    if (e.is_app())
+    {
+        z3::func_decl f = e.decl();
+        unsigned num = e.num_args();
+
+        auto decl_kind = f.decl_kind();
+
+        z3::expr_vector sim(e.ctx());
+        for (unsigned i = 0; i < num; ++i)
+            sim.push_back(RemoveInternal(e.arg(i)));
+
+        if (decl_kind == Z3_OP_BSDIV_I)
+            return sim[0] / sim[1];
+        if (decl_kind == Z3_OP_BSREM_I)
+            return z3::srem(sim[0], sim[1]);
+        if (decl_kind == Z3_OP_BSMOD_I)
+            return z3::smod(sim[0], sim[1]);
+        if (decl_kind == Z3_OP_BUDIV_I)
+            return z3::udiv(sim[0], sim[1]);
+        if (decl_kind == Z3_OP_BUREM_I)
+            return z3::urem(sim[0], sim[1]);
+
+        return f(sim);
+    }
+
+    if (e.is_quantifier())
+    {
+        auto bound = GetQuantBoundVars(e);
+
+        if (e.is_forall())
+            return z3::forall(bound, RemoveInternal(e.body()));
+        return z3::exists(bound, RemoveInternal(e.body()));
+    }
+
+    return e;
+}
+
+std::string GetThreadId()
+{
+    std::ostringstream ostr;
+    ostr << std::this_thread::get_id();
+    return ostr.str();
+}
+
 void SimplifierThread::Run()
 {
     expr = CollectVars(expr, 0);
+
+    if (!settings.simplify_whole_formula)
+    {
+        ExprSimplifier simplifier(expr.ctx(), true, true);
+        logger.Log("Simplifying...");
+        if (settings.dump_bdds)
+            logger.DumpFormula("in" + GetThreadId() + ".smt2", expr);
+        auto simplified = simplifier.Simplify(expr, true);
+        simplified = RemoveInternal(simplified);
+        if (settings.dump_bdds)
+        {
+            logger.DumpFormula("simplified" + GetThreadId() + ".smt2", simplified);
+            logger.DumpFormula("assertstrong" + GetThreadId() + ".smt2", expr && !simplified);
+            logger.DumpFormula("assertweak" + GetThreadId() + ".smt2", !expr && simplified);
+        }
+        expr = simplified;
+        logger.Log("Simplifying finished");
+    }
 
     transformer = std::make_unique<ExprToBDDTransformer>(expr.ctx(), expr, Config());
 

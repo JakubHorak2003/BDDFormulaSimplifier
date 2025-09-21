@@ -21,6 +21,7 @@ z3::expr FormulaSimplifier::Run()
 {
     auto out = RunSimplifications();
     logger.DumpFormula("out.smt2", out);
+    Solver::resultComputed = true;
     for (auto &t : threads)
         t.WaitForResult();
     return out;
@@ -28,11 +29,14 @@ z3::expr FormulaSimplifier::Run()
 
 z3::expr FormulaSimplifier::RunSimplifications()
 {
-    ExprSimplifier simplifier(expr.ctx(), true, true);
-    logger.Log("Simplifying...");
-    expr = simplifier.Simplify(expr);
-    expr = RemoveInternal(expr);
-    logger.DumpFormula("simplified.smt2", expr);
+    if (settings.simplify_whole_formula)
+    {
+        ExprSimplifier simplifier(expr.ctx(), true, true);
+        logger.Log("Simplifying...");
+        expr = simplifier.Simplify(expr);
+        expr = RemoveInternal(expr);
+        logger.DumpFormula("simplified.smt2", expr);
+    }
 
     std::vector<int> quant_cnts;
     CountQuantifiers(expr, 0, quant_cnts);
@@ -53,7 +57,6 @@ z3::expr FormulaSimplifier::RunSimplifications()
            !time_manager.IsTimeout())
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
-    Solver::resultComputed = true;
     if (time_manager.IsTimeout())
         logger.Log("Timeout");
 
@@ -222,45 +225,6 @@ void FormulaSimplifier::CountQuantifiers(z3::expr e, int depth, std::vector<int>
         ++res[depth];
         CountQuantifiers(e.body(), depth + 1, res);
     }
-}
-
-z3::expr FormulaSimplifier::RemoveInternal(z3::expr e)
-{
-    if (e.is_app())
-    {
-        z3::func_decl f = e.decl();
-        unsigned num = e.num_args();
-
-        auto decl_kind = f.decl_kind();
-
-        z3::expr_vector sim(e.ctx());
-        for (unsigned i = 0; i < num; ++i)
-            sim.push_back(RemoveInternal(e.arg(i)));
-
-        if (decl_kind == Z3_OP_BSDIV_I)
-            return sim[0] / sim[1];
-        if (decl_kind == Z3_OP_BSREM_I)
-            return z3::srem(sim[0], sim[1]);
-        if (decl_kind == Z3_OP_BSMOD_I)
-            return z3::smod(sim[0], sim[1]);
-        if (decl_kind == Z3_OP_BUDIV_I)
-            return z3::udiv(sim[0], sim[1]);
-        if (decl_kind == Z3_OP_BUREM_I)
-            return z3::urem(sim[0], sim[1]);
-
-        return f(sim);
-    }
-
-    if (e.is_quantifier())
-    {
-        auto bound = GetQuantBoundVars(e);
-
-        if (e.is_forall())
-            return z3::forall(bound, RemoveInternal(e.body()));
-        return z3::exists(bound, RemoveInternal(e.body()));
-    }
-
-    return e;
 }
 
 std::vector<z3::expr> FormulaSimplifier::PickResults(const std::vector<z3::expr> &approx, int n)

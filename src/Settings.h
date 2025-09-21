@@ -7,6 +7,7 @@ struct Settings
     int max_quants = 0;
     bool bddtof_pattern = true;
     bool dump_bdds = false;
+    bool simplify_whole_formula = false;
 };
 
 extern Settings settings;

@@ -13,6 +13,8 @@ z3::expr Translate(z3::expr e, z3::context &ctx);
 std::vector<z3::expr> Translate(const std::vector<z3::expr> &es, z3::context &ctx);
 z3::expr_vector GetQuantBoundVars(z3::expr e);
 
+z3::expr RemoveInternal(z3::expr e);
+
 using BDDNode = std::pair<DdNode *, bool>;
 
 class SimplifierThread
