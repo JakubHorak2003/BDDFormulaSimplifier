@@ -83,7 +83,7 @@ def load_v2(filename, tool_names, res, durs=None):
                     except ValueError:
                         print('ERROR', line)
 
-COMPARE = ['fbs_sw2_20+bitw_40', 'fbs_sw_20+bitw_40']
+COMPARE = ['fbs_tm_20+bitw_40', 'fbs_20+bitw_40']
 # COMPARE = ['fbs_pat_20+bitw_40', 'bitw_300']
 
 def analyze_durs(data, durs, tools):
@@ -122,7 +122,7 @@ def main():
     # load_v2('results_60s_sg.txt', ['', 'OLD_z3_sg', 'OLD_q3b_sg', 'OLD_cvc5_sg', 'OLD_bitw_sg'] + [f'OLD_myapp_sg_20+{t}_40' for t in SECONDARY_TOOLS], data)
     # load_v2('results_60s_sg_new.txt', ['', 'z3_60', 'q3b_60', 'cvc5_60', 'bitw_60'] + [f'fbs_20+{t}_40' for t in SECONDARY_TOOLS], data)
     # load_v2('results_60s_sg_pattern.txt', ['', 'PAT_z3_sg', 'PAT_q3b_sg', 'PAT_cvc5_sg', 'PAT_bitw_sg'] + [f'PAT_myapp_sg_20+{t}_40' for t in SECONDARY_TOOLS], data)
-    load_v2('results.txt', [''] + [f'fbs_sw2_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
+    load_v2('results.txt', [''] + [f'fbs_tm_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
     load_v2('results_60s_sg_ss_precise.txt', [''] + [f'fbs_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
     load_v2('results_60s_sg_pat.txt', ['', 'z3_60', 'q3b_60', 'cvc5_60', 'bitw_60'] + [f'fbs_sw_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
     # load_v2('results_60s_sg_ss.txt', ['', '', '', '', ''] + [f'fbs_bddonly_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
@@ -176,7 +176,7 @@ def main():
             conflicts += 1
             continue
 
-        if 'fbs_sw2_20+bitw_40' not in results_dct:
+        if 'fbs_tm_20+bitw_40' not in results_dct:
             continue
         
         bench_res = 'sat' if 'sat' in all_res else 'unsat' if 'unsat' in all_res else 'unknown'

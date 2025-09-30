@@ -2,6 +2,8 @@
 #include <utility>
 #include <z3++.h>
 
+#include "Settings.h"
+
 struct VarRange
 {
     z3::expr var;
@@ -94,12 +96,14 @@ struct EqNumeral
         {
             var.to = other.var.to;
             numeral.Extend(true, other.numeral);
+            ++stats.stats[Stats::NODES_MERGE_EQNUM];
             return true;
         }
         if (adj == -1)
         {
             var.from = other.var.from;
             numeral.Extend(false, other.numeral);
+            ++stats.stats[Stats::NODES_MERGE_EQNUM];
             return true;
         }
         return false;
@@ -127,12 +131,14 @@ struct EqVar
         {
             a.to = other.a.to;
             b.to = other.b.to;
+            ++stats.stats[Stats::NODES_MERGE_EQVAR];
             return true;
         }
         if (adja == -1 && adjb == -1)
         {
             a.from = other.a.from;
             b.from = other.b.from;
+            ++stats.stats[Stats::NODES_MERGE_EQVAR];
             return true;
         }
         return false;
@@ -186,12 +192,14 @@ struct IneqVar
         {
             a.to = other.a.to;
             b.to = other.b.to;
+            ++stats.stats[Stats::NODES_MERGE_INEQ];
             return true;
         }
         if (adja == -1 && adjb == -1)
         {
             a.from = other.a.from;
             b.from = other.b.from;
+            ++stats.stats[Stats::NODES_MERGE_INEQ];
             return true;
         }
         return false;

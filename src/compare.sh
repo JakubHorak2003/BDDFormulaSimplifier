@@ -16,7 +16,7 @@ RESULTS_FILE="results.txt"
 
 echo "Using cores $THREAD_0 and $THREAD_1"
 
-MYAPP_CMD="taskset -c $THREAD_0 ../../build/fbs2 --replace-precise:1 --simplify-whole:1"
+MYAPP_CMD="taskset -c $THREAD_0 ../../build/fbs2 --show-stats:1"
 Z3_CMD="z3"
 Q3B_CMD="taskset -c $THREAD_1 ../../build/external/q3b/q3b"
 CVC5_CMD="cvc5"

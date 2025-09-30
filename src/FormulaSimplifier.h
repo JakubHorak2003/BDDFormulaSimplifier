@@ -11,15 +11,17 @@ public:
     FormulaSimplifier(z3::expr expr) : expr(expr) {}
 
     z3::expr Run();
+
+private:
     z3::expr RunSimplifications();
 
-    z3::expr Simplify(z3::expr e, int depth, bool skip_current, std::list<SimplifierThread>::iterator &t_curr, bool use_over, bool use_under, int n_approx_pick);
+    z3::expr Simplify(z3::expr e, std::list<SimplifierThread>::iterator &t_curr, const std::vector<bool> &use, int &idx, bool use_over, bool use_under, int n_approx_pick);
 
-    void LaunchThreads(z3::expr e, int depth, bool skip_current, std::vector<z3::expr> &bound);
+    void FindSubformulas(z3::expr e, std::vector<bool> &use);
+    void LaunchThreads(z3::expr e, std::vector<z3::expr> &bound, const std::vector<bool> &use, int &idx);
 
     void CountQuantifiers(z3::expr e, int depth, std::vector<int> &res);
 
-private:
     std::vector<z3::expr> PickResults(const std::vector<z3::expr> &approx, int n);
     z3::expr expr;
 

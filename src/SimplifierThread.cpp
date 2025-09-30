@@ -129,6 +129,8 @@ void SimplifierThread::RunApprox()
     if (Solver::resultComputed)
         return;
 
+    ++stats.stats[Stats::SUBF_CNT];
+
     if (!overapproximate)
         transformer->setApproximationType(ZERO_EXTEND);
 
@@ -160,6 +162,7 @@ void SimplifierThread::RunApprox()
             logger.Log("Bdd always false " + approx_str + " " + std::to_string(bw) + " " + std::to_string(prec));
             result.clear();
             result.push_back(expr.ctx().bool_val(false));
+            ++stats.stats[Stats::SUBF_CONST];
             return;
         }
         if (!overapproximate && bdd.IsOne())
@@ -169,6 +172,7 @@ void SimplifierThread::RunApprox()
             auto cand = FixUnder(expr.ctx().bool_val(true), bw);
             assert(!isFalse(cand));
             result.push_back(cand);
+            ++stats.stats[Stats::SUBF_CONST];
             return;
         }
 
@@ -192,6 +196,7 @@ void SimplifierThread::RunApprox()
         {
             logger.Log("Precise result returned");
             precise = true;
+            ++stats.stats[Stats::SUBF_PREC];
             break;
         }
 
@@ -225,6 +230,8 @@ z3::expr SimplifierThread::BDDToFormula(const BDDNode &node)
     if (expr_cache.find(node) != expr_cache.end())
         return expr_cache.at(node);
 
+    ++stats.stats[Stats::NODES_CNT];
+
     auto var = GetNodeVar(node.first);
     auto tchild = GetNodeChild(node, true);
     auto fchild = GetNodeChild(node, false);
@@ -255,6 +262,8 @@ z3::expr SimplifierThread::BDDToFormulaWithPatterns(const BDDNode &node)
     if (expr_cache.find(node) != expr_cache.end())
         return expr_cache.at(node);
 
+    ++stats.stats[Stats::NODES_CNT];
+
     auto var = GetNodeVar(node.first);
     auto tchild = GetNodeChild(node, true);
     auto fchild = GetNodeChild(node, false);
@@ -273,6 +282,7 @@ z3::expr SimplifierThread::BDDToFormulaWithPatterns(const BDDNode &node)
     z3::expr result(expr.ctx());
     if (tvar == fvar && !tvar.IsInvalid() && GetNodeChild(tchild, true) == GetNodeChild(fchild, false) && GetNodeChild(tchild, false) == GetNodeChild(fchild, true))
     {
+        ++stats.stats[Stats::NODES_BASE_EQVAR];
         EqVar cv(var, tvar);
         auto texpr = BDDToFormulaWithPatterns(GetNodeChild(tchild, true));
         auto fexpr = BDDToFormulaWithPatterns(GetNodeChild(tchild, false));
@@ -280,6 +290,7 @@ z3::expr SimplifierThread::BDDToFormulaWithPatterns(const BDDNode &node)
     }
     else if (!fvar.IsInvalid() && fvar.var.to_string() != var.var.to_string() && GetNodeChild(fchild, false) == tchild)
     {
+        ++stats.stats[Stats::NODES_BASE_INEQ];
         auto texpr = BDDToFormulaWithPatterns(tchild);
         auto fexpr = BDDToFormulaWithPatterns(GetNodeChild(fchild, true));
         IneqVar iv(fvar, var, true);
@@ -287,6 +298,7 @@ z3::expr SimplifierThread::BDDToFormulaWithPatterns(const BDDNode &node)
     }
     else if (!tvar.IsInvalid() && tvar.var.to_string() != var.var.to_string() && GetNodeChild(tchild, true) == fchild)
     {
+        ++stats.stats[Stats::NODES_BASE_INEQ];
         auto texpr = BDDToFormulaWithPatterns(fchild);
         auto fexpr = BDDToFormulaWithPatterns(GetNodeChild(tchild, false));
         IneqVar iv(var, tvar, true);

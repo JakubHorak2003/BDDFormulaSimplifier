@@ -31,7 +31,8 @@ void PrintUsage(const char *argv0)
     std::cout << "    --bddtof-pattern:[1/0] enable pattern detection in BDD to formula conversion if 1, default 1\n";
     std::cout << "    --dump-bdds:[1/0] save all computed bdds as .dot files if 1, default 0\n";
     std::cout << "    --simplify-whole:[1/0] whether to simplify the whole formula (1) or only the processed subformulas (0), default 0\n";
-    std::cout << "    --replace-precise:[1/0] if 1, replaces the subformula if the precise BDD is computed, default 0\n";
+    std::cout << "    --replace-precise:[1/0] replaces the subformula if the precise BDD is computed if 1, default 1\n";
+    std::cout << "    --show-stats:[1/0] shows various statistics from the conversion process if 1, default 0\n";
 }
 
 int main(int argc, char **argv)
@@ -102,6 +103,10 @@ int main(int argc, char **argv)
         else if (sscanf(argv[i], "--replace-precise:%d", &x) == 1 && x >= 0 && x <= 1)
         {
             settings.replace_precise = (bool)x;
+        }
+        else if (sscanf(argv[i], "--show-stats:%d", &x) == 1 && x >= 0 && x <= 1)
+        {
+            settings.show_stats = (bool)x;
         }
         else
         {
