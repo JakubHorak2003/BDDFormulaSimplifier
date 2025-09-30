@@ -83,10 +83,10 @@ z3::expr RemoveInternal(z3::expr e)
     return e;
 }
 
-std::string GetThreadId()
+std::string SimplifierThread::GetThreadId() const
 {
     std::ostringstream ostr;
-    ostr << std::this_thread::get_id();
+    ostr << thread.get_id();
     return ostr.str();
 }
 
@@ -100,7 +100,7 @@ void SimplifierThread::Run()
         logger.Log("Simplifying...");
         if (settings.dump_bdds)
             logger.DumpFormula("in" + GetThreadId() + ".smt2", expr);
-        auto simplified = simplifier.Simplify(expr, true);
+        auto simplified = simplifier.Simplify(expr, !whole_formula);
         simplified = RemoveInternal(simplified);
         if (settings.dump_bdds)
         {
@@ -112,9 +112,14 @@ void SimplifierThread::Run()
         logger.Log("Simplifying finished");
     }
 
-    transformer = std::make_unique<ExprToBDDTransformer>(expr.ctx(), expr, Config());
-
-    RunApprox();
+    try
+    {
+        RunApprox();
+    }
+    catch (const std::logic_error &e)
+    {
+        logger.Log("Terminated");
+    }
 
     finished = true;
 }
@@ -131,12 +136,15 @@ void SimplifierThread::RunApprox()
 
     int bw = 1;
     int prec = 1;
-    std::vector<int> node_counts;
-    node_counts.push_back(0);
+    int last_n_nodes = 0;
+    bool fresh_bw = true;
+
+    transformer = std::make_unique<ExprToBDDTransformer>(expr.ctx(), expr, Config());
     while (bw <= 128)
     {
         // logger.Log("Running expr to bdd (over = " + std::to_string(overapproximate) +
         //             "; bw = " + std::to_string(bw) + "; prec = " + std::to_string(prec) + ")...");
+
         BDDInterval bdds;
         if (overapproximate)
             bdds = transformer->ProcessOverapproximation(bw, prec);
@@ -164,8 +172,7 @@ void SimplifierThread::RunApprox()
             return;
         }
 
-        int nc = bdd.nodeCount();
-        if (nc != node_counts.back() && !bdd.IsZero() && !bdd.IsOne())
+        if (bdd.nodeCount() != last_n_nodes)
         {
             logger.Log("Useful result returned (" + std::to_string(bdd.nodeCount()) + " nodes) " + approx_str + " " + std::to_string(bw) + " " + std::to_string(prec));
             // logger.DumpBDD(bdd);
@@ -177,17 +184,25 @@ void SimplifierThread::RunApprox()
                 cand = FixUnder(cand, bw);
             if (Solver::resultComputed)
                 return;
-            node_counts.push_back(nc);
-            assert(!isFalse(cand) && !isTrue(cand));
+            last_n_nodes = bdd.nodeCount();
             result.push_back(cand);
         }
 
+        if (transformer->IsPreciseResult() && fresh_bw)
+        {
+            logger.Log("Precise result returned");
+            precise = true;
+            break;
+        }
+
+        int last_bw = bw;
         if (transformer->OperationApproximationHappened())
             prec *= 4;
         else if (bw == 1)
             bw = 2;
         else
             bw += 2;
+        fresh_bw = bw > last_bw;
     }
 
     logger.Log("Done");
@@ -291,7 +306,6 @@ z3::expr SimplifierThread::BDDToFormulaWithPatterns(const BDDNode &node)
 
 z3::expr SimplifierThread::BDDToFormula(const BDD &bdd)
 {
-    expr_cache.clear();
     idx_to_var.clear();
     for (const auto &[name, bvec] : transformer->vars)
     {
@@ -301,10 +315,12 @@ z3::expr SimplifierThread::BDDToFormula(const BDD &bdd)
             idx_to_var[idx] = std::make_pair(name, i);
         }
     }
-    expr_cache.emplace(BDDNode{Cudd_ReadOne(bdd.manager()), false}, expr.ctx().bool_val(true));
-    expr_cache.emplace(BDDNode{Cudd_ReadOne(bdd.manager()), true}, expr.ctx().bool_val(false));
-    expr_cache.emplace(BDDNode{Cudd_ReadZero(bdd.manager()), false}, expr.ctx().bool_val(false));
-    expr_cache.emplace(BDDNode{Cudd_ReadZero(bdd.manager()), true}, expr.ctx().bool_val(true));
+
+    expr_cache.clear();
+    expr_cache.emplace(BDDNode{Cudd_ReadOne(transformer->bddManager.getManager()), false}, expr.ctx().bool_val(true));
+    expr_cache.emplace(BDDNode{Cudd_ReadOne(transformer->bddManager.getManager()), true}, expr.ctx().bool_val(false));
+    expr_cache.emplace(BDDNode{Cudd_ReadZero(transformer->bddManager.getManager()), false}, expr.ctx().bool_val(false));
+    expr_cache.emplace(BDDNode{Cudd_ReadZero(transformer->bddManager.getManager()), true}, expr.ctx().bool_val(true));
 
     z3::expr ne(expr.ctx());
     if (settings.bddtof_pattern)

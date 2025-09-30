@@ -8,6 +8,7 @@ struct Settings
     bool bddtof_pattern = true;
     bool dump_bdds = false;
     bool simplify_whole_formula = false;
+    bool replace_precise = false;
 };
 
 extern Settings settings;

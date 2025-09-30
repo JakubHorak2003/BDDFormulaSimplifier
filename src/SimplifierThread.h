@@ -21,8 +21,8 @@ class SimplifierThread
 {
 public:
     SimplifierThread(SimplifierThread &&) = default;
-    SimplifierThread(z3::expr e, bool over, const std::vector<z3::expr> &bnd) : overapproximate(over), expr(Translate(e, ctx)), pre_bound(Translate(bnd, ctx)), thread([this]
-                                                                                                                                                                       { Run(); })
+    SimplifierThread(z3::expr e, bool over, const std::vector<z3::expr> &bnd, bool whole = false) : overapproximate(over), whole_formula(whole), expr(Translate(e, ctx)), pre_bound(Translate(bnd, ctx)), thread([this]
+                                                                                                                                                                                                                 { Run(); })
     {
     }
 
@@ -31,17 +31,22 @@ public:
 
     void WaitForResult() { thread.join(); }
 
+    std::string GetThreadId() const;
+
     bool IsFinished() const { return finished; }
+    bool IsPrecise() const { return precise; }
 
     const std::vector<z3::expr> &GetResult() const { return result; }
 
 private:
     bool overapproximate;
+    bool whole_formula;
     z3::context ctx;
     z3::expr expr;
     std::vector<z3::expr> pre_bound;
     std::vector<z3::expr> result;
     bool finished = false;
+    bool precise = false;
 
     std::unique_ptr<ExprToBDDTransformer> transformer;
 

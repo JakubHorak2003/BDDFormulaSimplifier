@@ -9,5 +9,5 @@ for (( i=0; i<N_PROCESSES; i++ )); do
     rm -rf "tmp$i"
     mkdir "tmp$i"
     ./compare.sh "all_files_$i.txt" "$TIMEOUT_VAL" "$MYAPP_TIMEOUT" "$i" &
-    sleep 30
+    sleep 5
 done

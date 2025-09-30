@@ -32,13 +32,16 @@ def add_tool(dct, subtools):
     dct[name] = result
 
 def augment_tools(dct):
-    # keys= list(dct.keys())
+    keys= list(dct.keys())
     # for k1 in keys:
     #     for k2 in keys:
-    #         if k1 < k2:
-    #             add_tool
+    #         for k3 in keys:
+    #             if k1 < k2 < k3:
+    #                 add_tool(dct, [k1, k2, k3])
     pass
-    # add_tool(dct, ['q3b_300', 'bitw_300'])
+    # add_tool(dct, ['q3b_60', 'bitw_60'])
+    # add_tool(dct, ['fbs_var4_prec_20+bitw_40', 'q3b_60'])
+    # add_tool(dct, ['fbs_var4_prec_20+bitw_40', 'bitw_60'])
     # add_tool(dct, ['fbs_pat_100+bitw_200', 'bitw_300'])
 
     # for t in SECONDARY_TOOLS:
@@ -80,7 +83,7 @@ def load_v2(filename, tool_names, res, durs=None):
                     except ValueError:
                         print('ERROR', line)
 
-COMPARE = ['fbs_pat_ss_20+bitw_40', 'fbs_pat_20+bitw_40']
+COMPARE = ['fbs_sw2_20+bitw_40', 'fbs_sw_20+bitw_40']
 # COMPARE = ['fbs_pat_20+bitw_40', 'bitw_300']
 
 def analyze_durs(data, durs, tools):
@@ -119,8 +122,16 @@ def main():
     # load_v2('results_60s_sg.txt', ['', 'OLD_z3_sg', 'OLD_q3b_sg', 'OLD_cvc5_sg', 'OLD_bitw_sg'] + [f'OLD_myapp_sg_20+{t}_40' for t in SECONDARY_TOOLS], data)
     # load_v2('results_60s_sg_new.txt', ['', 'z3_60', 'q3b_60', 'cvc5_60', 'bitw_60'] + [f'fbs_20+{t}_40' for t in SECONDARY_TOOLS], data)
     # load_v2('results_60s_sg_pattern.txt', ['', 'PAT_z3_sg', 'PAT_q3b_sg', 'PAT_cvc5_sg', 'PAT_bitw_sg'] + [f'PAT_myapp_sg_20+{t}_40' for t in SECONDARY_TOOLS], data)
-    load_v2('results.txt', ['', '', '', '', ''] + [f'fbs_pat_ss_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
-    load_v2('results_60s_sg_pat.txt', ['', 'z3_60', 'q3b_60', 'cvc5_60', 'bitw_60'] + [f'fbs_pat_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
+    load_v2('results.txt', [''] + [f'fbs_sw2_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
+    load_v2('results_60s_sg_ss_precise.txt', [''] + [f'fbs_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
+    load_v2('results_60s_sg_pat.txt', ['', 'z3_60', 'q3b_60', 'cvc5_60', 'bitw_60'] + [f'fbs_sw_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
+    # load_v2('results_60s_sg_ss.txt', ['', '', '', '', ''] + [f'fbs_bddonly_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
+    # load_v2('results_60s_sg_ss_wf.txt', [''] + [f'fbs_var3_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
+    # load_v2('results_60s_sg_pat_wfo.txt', [''] + [f'fbs_pat_wfo_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
+    # load_v2('results_60s_sg_ss_nn.txt', [''] + [f'fbs_pat_ssnn_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
+    # load_v2('results_60s_sg_ss_wfns.txt', [''] + [f'fbs_var4_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
+    # load_v2('results_60s_sg_ss_wfonly.txt', [''] + [f'fbs_wfonly_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
+    # load_v2('results_60s_sg_ss_wfns_nqr.txt', [''] + [f'fbs_var4_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
     # load_v2('results.txt', ['', 'z3_300', 'q3b_300', 'cvc5_300', 'bitw_300'] + [f'fbs_100+{t}_200' for t in SECONDARY_TOOLS], data, durs)
     # load_v2('results_300s_sg_pat.txt', ['', 'z3_300', 'q3b_300', 'cvc5_300', 'bitw_300'] + [f'fbs_pat_100+{t}_200' for t in SECONDARY_TOOLS], data, durs)
     # load_v2('results_300s_sg_pat_20+280.txt', ['', '', '', '', ''] + [f'fbs_pat_20+{t}_280' for t in SECONDARY_TOOLS], data)
@@ -136,11 +147,12 @@ def main():
     # for i in range(4603):
     #     data[f'unsat{i}'] = {t:'unsat' for t in all_tools}
 
-    with open('out.csv', 'w') as file:
-        keys = list(next(iter(data.values())).keys())
-        print(','.join(keys), file=file)
-        for bench, res in data.items():
-            print(bench,*res.values(),file=file,sep=',')
+    # with open('out.csv', 'w') as file:
+    #     keys = list(next(iter(data.values())).keys())
+    #     print(','.join(['bench'] + keys), file=file)
+    #     for bench, res in data.items():
+    #         vals = [res[t] for t in keys]
+    #         print(bench,*vals,file=file,sep=',')
 
     total_perf = defaultdict(int)
     sat_perf = defaultdict(int)
@@ -164,7 +176,7 @@ def main():
             conflicts += 1
             continue
 
-        if 'fbs_pat_ss_20+bitw_40' not in results_dct:
+        if 'fbs_sw2_20+bitw_40' not in results_dct:
             continue
         
         bench_res = 'sat' if 'sat' in all_res else 'unsat' if 'unsat' in all_res else 'unknown'
@@ -206,9 +218,14 @@ def main():
             print('WORSE', bench_res, benchmark)
             worse += 1
 
-        if solved_tools and all('fbs' in t or t == 'total solved' for t in solved_tools):
+        if solved_tools and all('fbs' in t or t == 'total solved' for t in solved_tools) and any('fbs_var4' in t for t in solved_tools):
             print('MYAPP', benchmark, bench_res, solved_tools)
             myapp_only += 1
+
+        # if 'q3b_60' in solved_tools and 'bitw_60' in solved_tools and 'fbs_var4_prec_20+bitw_40' not in solved_tools:
+        #     print('BADBAD', benchmark)
+        # if 'q3b_60' not in solved_tools and 'bitw_60' not in solved_tools and 'fbs_var4_prec_20+bitw_40' in solved_tools:
+        #     print('GOODGOOD', benchmark)
 
 
 

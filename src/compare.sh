@@ -8,15 +8,15 @@ BENCHMARK_FOLDER="$1"
 TIMEOUT_VAL="$2"
 MYAPP_TIMEOUT="$3"
 PROCESS_INDEX="$4"
-THREAD_0=$(( PROCESS_INDEX * 4 ))
-THREAD_1=$(( PROCESS_INDEX * 4 + 2 ))
+THREAD_0=$(( PROCESS_INDEX * 2 ))
+THREAD_1=$(( PROCESS_INDEX * 2 + 1 ))
 MYAPP_TIMEOUT_MS=$(( MYAPP_TIMEOUT * 1000 ))
 SECOND_TIMEOUT=$((TIMEOUT_VAL - MYAPP_TIMEOUT))
 RESULTS_FILE="results.txt"
 
 echo "Using cores $THREAD_0 and $THREAD_1"
 
-MYAPP_CMD="taskset -c $THREAD_0 ../../build/fbs2"
+MYAPP_CMD="taskset -c $THREAD_0 ../../build/fbs2 --replace-precise:1 --simplify-whole:1"
 Z3_CMD="z3"
 Q3B_CMD="taskset -c $THREAD_1 ../../build/external/q3b/q3b"
 CVC5_CMD="cvc5"
@@ -88,12 +88,12 @@ cat "$BENCHMARK_FOLDER" | while read -r FILE; do
 
     ALL_TOOLS=()
 
-    for tool in "${BASE_TOOLS[@]}"; do
-        TEMP_FILES["$tool"]=$(mktemp)
-        (result=$(run_tool "$TIMEOUT_VAL" "${COMMANDS[$tool]}" "../$FILE"); echo "$result" > "${TEMP_FILES[$tool]}") &
-        PIDS["$tool"]=$!
-        ALL_TOOLS+=("$tool")
-    done
+    # for tool in "${BASE_TOOLS[@]}"; do
+    #     TEMP_FILES["$tool"]=$(mktemp)
+    #     (result=$(run_tool "$TIMEOUT_VAL" "${COMMANDS[$tool]}" "../$FILE"); echo "$result" > "${TEMP_FILES[$tool]}") &
+    #     PIDS["$tool"]=$!
+    #     ALL_TOOLS+=("$tool")
+    # done
 
     read MY_TOOL_RESULT MY_TOOL_DURATION < <(evaluate_mytool "../$FILE" "$MYAPP_TIMEOUT")
 
