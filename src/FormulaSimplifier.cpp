@@ -20,7 +20,7 @@
 z3::expr FormulaSimplifier::Run()
 {
     auto out = RunSimplifications();
-    logger.DumpFormula("out.smt2", out);
+    logger.DumpFormula(settings.output_file, out);
     if (settings.show_stats)
         stats.Dump(std::cout);
     for (auto &t : threads)
@@ -36,7 +36,8 @@ z3::expr FormulaSimplifier::RunSimplifications()
         logger.Log("Simplifying...");
         expr = simplifier.Simplify(expr);
         expr = RemoveInternal(expr);
-        logger.DumpFormula("simplified.smt2", expr);
+        if (settings.dump_bdds)
+            logger.DumpFormula("simplified.smt2", expr);
     }
 
     std::vector<bool> use;

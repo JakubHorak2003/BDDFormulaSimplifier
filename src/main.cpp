@@ -33,6 +33,7 @@ void PrintUsage(const char *argv0)
     std::cout << "    --simplify-whole:[1/0] whether to simplify the whole formula (1) or only the processed subformulas (0), default 0\n";
     std::cout << "    --replace-precise:[1/0] replaces the subformula if the precise BDD is computed if 1, default 1\n";
     std::cout << "    --show-stats:[1/0] shows various statistics from the conversion process if 1, default 0\n";
+    std::cout << "    --out:filename the name of the output file, default out.smt2\n";
 }
 
 int main(int argc, char **argv)
@@ -68,6 +69,7 @@ int main(int argc, char **argv)
     for (int i = 1; i < argc - 1; ++i)
     {
         int x = 0;
+        char buf[257];
         if (sscanf(argv[i], "--verbose:%d", &x) == 1 && x >= 0 && x <= 1)
         {
             logger.SetEnabled(x);
@@ -107,6 +109,10 @@ int main(int argc, char **argv)
         else if (sscanf(argv[i], "--show-stats:%d", &x) == 1 && x >= 0 && x <= 1)
         {
             settings.show_stats = (bool)x;
+        }
+        else if (sscanf(argv[i], "--out:%256s", buf) == 1)
+        {
+            settings.output_file = buf;
         }
         else
         {

@@ -11,6 +11,7 @@ struct Settings
     bool simplify_whole_formula = false;
     bool replace_precise = true;
     bool show_stats = false;
+    std::string output_file = "out.smt2";
 };
 
 struct Stats

@@ -332,12 +332,13 @@ antlrcpp::Any FBS_SMTVisitor::visitCommand(SMTLIBv2Parser::CommandContext *comma
                 ev.push_back(x);
         }
         auto expr = ev.size() == 1 ? ev[0] : z3::mk_and(ev);
-        logger.DumpFormula("in.smt2", expr);
+        if (settings.dump_bdds)
+            logger.DumpFormula("in.smt2", expr);
 
         FormulaSimplifier fs(expr);
         auto new_expr = fs.Run();
 
-        logger.DumpFormula("out.smt2", new_expr);
+        logger.DumpFormula(settings.output_file, new_expr);
     }
     else if (command->cmd_getModel())
     {
