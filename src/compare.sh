@@ -16,7 +16,7 @@ RESULTS_FILE="results.txt"
 
 echo "Using cores $THREAD_0 and $THREAD_1"
 
-MYAPP_CMD="taskset -c $THREAD_0 ../../build/fbs2 --show-stats:1"
+MYAPP_CMD="taskset -c $THREAD_0 ../../build/fbs2 --show-stats:1 --approx-wf:1,1"
 Z3_CMD="z3"
 Q3B_CMD="taskset -c $THREAD_1 ../../build/external/q3b/q3b"
 CVC5_CMD="cvc5"
@@ -61,7 +61,7 @@ evaluate_mytool() {
     cp "$file" simplified.smt2
     local start_time_ms=$(date +%s%3N)
     local output
-    output=$(timeout "$((timeout + 9))" $MYAPP_CMD --verbose:1 --timeout:$((timeout - 1)) "$file" 2>&1)
+    output=$(timeout "$((timeout + 9))" $MYAPP_CMD --verbose:1 --timeout:$((timeout - 0)) "$file" 2>&1)
     local exit_code=$?
     local end_time_ms=$(date +%s%3N)
     local duration_ms=$(( end_time_ms - start_time_ms ))

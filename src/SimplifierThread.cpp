@@ -100,7 +100,7 @@ void SimplifierThread::Run()
         logger.Log("Simplifying...");
         if (settings.dump_bdds)
             logger.DumpFormula("in" + GetThreadId() + ".smt2", expr);
-        auto simplified = simplifier.Simplify(expr, !whole_formula);
+        auto simplified = simplifier.Simplify(expr, true);
         simplified = RemoveInternal(simplified);
         if (settings.dump_bdds)
         {
@@ -131,6 +131,7 @@ void SimplifierThread::RunApprox()
 
     ++stats.stats[Stats::SUBF_CNT];
 
+    transformer = std::make_unique<ExprToBDDTransformer>(expr.ctx(), expr, Config());
     if (!overapproximate)
         transformer->setApproximationType(ZERO_EXTEND);
 
@@ -141,7 +142,6 @@ void SimplifierThread::RunApprox()
     int last_n_nodes = 0;
     bool fresh_bw = true;
 
-    transformer = std::make_unique<ExprToBDDTransformer>(expr.ctx(), expr, Config());
     while (bw <= 128)
     {
         // logger.Log("Running expr to bdd (over = " + std::to_string(overapproximate) +
@@ -163,6 +163,8 @@ void SimplifierThread::RunApprox()
             result.clear();
             result.push_back(expr.ctx().bool_val(false));
             ++stats.stats[Stats::SUBF_CONST];
+            if (whole_formula)
+                ++stats.stats[Stats::SUBF_TOP_CONST];
             return;
         }
         if (!overapproximate && bdd.IsOne())
@@ -173,6 +175,8 @@ void SimplifierThread::RunApprox()
             assert(!isFalse(cand));
             result.push_back(cand);
             ++stats.stats[Stats::SUBF_CONST];
+            if (whole_formula)
+                ++stats.stats[Stats::SUBF_TOP_CONST];
             return;
         }
 
@@ -196,7 +200,18 @@ void SimplifierThread::RunApprox()
         {
             logger.Log("Precise result returned");
             precise = true;
+
             ++stats.stats[Stats::SUBF_PREC];
+            if (!bdd.IsOne() && !bdd.IsZero())
+                ++stats.stats[Stats::SUBF_PREC_NONTRIV];
+
+            if (whole_formula)
+            {
+                ++stats.stats[Stats::SUBF_TOP_PREC];
+                if (!bdd.IsOne() && !bdd.IsZero())
+                    ++stats.stats[Stats::SUBF_TOP_PREC_NONTRIV];
+            }
+
             break;
         }
 

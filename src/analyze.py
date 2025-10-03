@@ -67,7 +67,6 @@ def load(filename, tool_names, res, durs=None):
 
 def fix_path(path):
     parts = path.split('/')
-    print(parts)
     i = parts.index('BV')
     return '/'.join(parts[i+1:])
 
@@ -90,7 +89,7 @@ def load_v2(filename, tool_names, res, durs=None):
                     except ValueError:
                         print('ERROR', line)
 
-COMPARE = ['bitw_900', 'bitw_60']
+COMPARE = ['fbs_20+bitw_40', 'fbs_20+bitw_40']
 # COMPARE = ['fbs_pat_20+bitw_40', 'bitw_300']
 
 def analyze_durs(data, durs, tools):
@@ -129,8 +128,10 @@ def main():
     # load_v2('results_60s_sg.txt', ['', 'OLD_z3_sg', 'OLD_q3b_sg', 'OLD_cvc5_sg', 'OLD_bitw_sg'] + [f'OLD_myapp_sg_20+{t}_40' for t in SECONDARY_TOOLS], data)
     # load_v2('results_60s_sg_new.txt', ['', 'z3_60', 'q3b_60', 'cvc5_60', 'bitw_60'] + [f'fbs_20+{t}_40' for t in SECONDARY_TOOLS], data)
     # load_v2('results_60s_sg_pattern.txt', ['', 'PAT_z3_sg', 'PAT_q3b_sg', 'PAT_cvc5_sg', 'PAT_bitw_sg'] + [f'PAT_myapp_sg_20+{t}_40' for t in SECONDARY_TOOLS], data)
-    load_v2('results_900s.txt', ['', 'z3_900', 'cvc5_900', 'bitw_900'], data, durs)
-    load_v2('results_60s_sg_ss_precise.txt', [''] + [f'fbs_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
+    load_v2('results_z3_cvc5_bitw.txt', ['', 'z3_600', 'cvc5_600', 'bitw_600'], data, durs)
+    load_v2('results_q3b.txt', ['', 'q3b_600'], data, durs)
+    # load_v2('results.txt', [''] + [f'fbs_wfu_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
+    load_v2('results_60s_sg_ss_prec_wfp.txt', [''] + [f'fbs_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
     load_v2('results_60s_sg_pat.txt', ['', 'z3_60', 'q3b_60', 'cvc5_60', 'bitw_60'] + [f'fbs_sw_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
     # load_v2('results_60s_sg_ss.txt', ['', '', '', '', ''] + [f'fbs_bddonly_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
     # load_v2('results_60s_sg_ss_wf.txt', [''] + [f'fbs_var3_20+{t}_40' for t in SECONDARY_TOOLS], data, durs)
@@ -183,8 +184,8 @@ def main():
             conflicts += 1
             continue
 
-        if 'z3_900' not in results_dct:
-            continue
+        # if 'fbs_wfu_20+bitw_40' not in results_dct:
+        #     continue
         
         bench_res = 'sat' if 'sat' in all_res else 'unsat' if 'unsat' in all_res else 'unknown'
         solved_tools = [t for t, r in results_dct.items() if r == bench_res]
@@ -225,7 +226,7 @@ def main():
             print('WORSE', bench_res, benchmark)
             worse += 1
 
-        if solved_tools and all('fbs' in t or t == 'total solved' for t in solved_tools) and any('fbs_var4' in t for t in solved_tools):
+        if solved_tools and all('fbs' in t or t == 'total solved' for t in solved_tools) and any('fbs_20' in t for t in solved_tools):
             print('MYAPP', benchmark, bench_res, solved_tools)
             myapp_only += 1
 

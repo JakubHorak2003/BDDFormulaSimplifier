@@ -1,8 +1,8 @@
 diff --git a/lib/ExprToBDDTransformer.cpp b/lib/ExprToBDDTransformer.cpp
-index 32a9e78..4bf0e52 100644
+index e4503be..e807443 100644
 --- a/lib/ExprToBDDTransformer.cpp
 +++ b/lib/ExprToBDDTransformer.cpp
-@@ -469,7 +469,7 @@ BDDInterval ExprToBDDTransformer::getBDDFromExpr(const expr &e, const vector<bou
+@@ -482,7 +482,7 @@ BDDInterval ExprToBDDTransformer::getBDDFromExpr(const expr &e, const vector<bou
  	}
  
  	BDDInterval bodyBdd;
@@ -11,8 +11,17 @@ index 32a9e78..4bf0e52 100644
  	{
  	    if (Z3_is_quantifier_forall(*context, ast))
  	    {
+@@ -1147,7 +1147,7 @@ Model ExprToBDDTransformer::GetModel(BDD modelBdd)
+ 
+ 	const auto varSort = varSorts.find(name)->second;
+ 	if (varSort.is_bool()) {
+-	    model.insert({name, modelBV[0]});
++	    model.insert({name, (bool)modelBV[0]});
+ 	} else {
+ 	    model.insert({name, modelBV});
+ 	}
 diff --git a/lib/ExprToBDDTransformer.h b/lib/ExprToBDDTransformer.h
-index 2229946..a2404b6 100644
+index c255240..9e8d25a 100644
 --- a/lib/ExprToBDDTransformer.h
 +++ b/lib/ExprToBDDTransformer.h
 @@ -29,7 +29,7 @@ using namespace cudd;

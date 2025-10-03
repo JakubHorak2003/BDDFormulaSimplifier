@@ -25,9 +25,8 @@ void PrintUsage(const char *argv0)
     std::cout << "Available options:\n";
     std::cout << "    --verbose:[1/0] prints debug output if 1, default 0\n";
     std::cout << "    --timeout:n timeout in seconds, 0 for no timeout, default 0\n";
-    std::cout << "    --use-over:[1/0] whether to use overapproximations, default 1\n";
-    std::cout << "    --use-under:[1/0] whether to use underapproximations, default 0\n";
-    std::cout << "    --max-quants:n maximum number of quantifiers, 0 for no limit, default 0\n";
+    std::cout << "    --approx:[1/0],[1/0] which approximations to use on the subformulas (over, under), default 1,0\n";
+    std::cout << "    --approx-wf:[1/0],[1/0] which approximations to use on the whole formula (over, under), default 1,0\n";
     std::cout << "    --bddtof-pattern:[1/0] enable pattern detection in BDD to formula conversion if 1, default 1\n";
     std::cout << "    --dump-bdds:[1/0] save all computed bdds as .dot files if 1, default 0\n";
     std::cout << "    --simplify-whole:[1/0] whether to simplify the whole formula (1) or only the processed subformulas (0), default 0\n";
@@ -68,7 +67,7 @@ int main(int argc, char **argv)
 
     for (int i = 1; i < argc - 1; ++i)
     {
-        int x = 0;
+        int x = 0, y = 0;
         char buf[257];
         if (sscanf(argv[i], "--verbose:%d", &x) == 1 && x >= 0 && x <= 1)
         {
@@ -78,17 +77,15 @@ int main(int argc, char **argv)
         {
             time_manager.SetTimeout(x);
         }
-        else if (sscanf(argv[i], "--use-over:%d", &x) == 1 && x >= 0 && x <= 1)
+        else if (sscanf(argv[i], "--approx:%d,%d", &x, &y) == 2 && x >= 0 && x <= 1 && y >= 0 && y <= 1)
         {
             settings.use_over = (bool)x;
+            settings.use_under = (bool)y;
         }
-        else if (sscanf(argv[i], "--use-under:%d", &x) == 1 && x >= 0 && x <= 1)
+        else if (sscanf(argv[i], "--approx-wf:%d,%d", &x, &y) == 2 && x >= 0 && x <= 1 && y >= 0 && y <= 1)
         {
-            settings.use_under = (bool)x;
-        }
-        else if (sscanf(argv[i], "--max-quants:%d", &x) == 1)
-        {
-            settings.max_quants = x;
+            settings.use_whole_over = (bool)x;
+            settings.use_whole_under = (bool)y;
         }
         else if (sscanf(argv[i], "--bddtof-pattern:%d", &x) == 1 && x >= 0 && x <= 1)
         {

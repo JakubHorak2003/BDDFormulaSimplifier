@@ -5,7 +5,9 @@ struct Settings
 {
     bool use_over = true;
     bool use_under = false;
-    int max_quants = 0;
+    bool use_whole_over = true;
+    bool use_whole_under = false;
+    int n_approx_pick = 2;
     bool bddtof_pattern = true;
     bool dump_bdds = false;
     bool simplify_whole_formula = false;
@@ -16,12 +18,30 @@ struct Settings
 
 struct Stats
 {
-    static constexpr const char *stat_names[] = {"subformulas.count", "subformulas.precise", "subformulas.const", "nodes.count", "nodes.merge.eqnum", "nodes.merge.eqvar", "nodes.merge.ineq", "nodes.base.eqvar", "nodes.base.ineq"};
+    static constexpr const char *stat_names[] = {
+        "subformulas.count",
+        "subformulas.precise",
+        "subformulas.precise.nontrivial",
+        "subformulas.const",
+        "subformulas.toplevel.precise",
+        "subformulas.toplevel.precise.nontrivial",
+        "subformulas.toplevel.const",
+        "nodes.count",
+        "nodes.merge.eqnum",
+        "nodes.merge.eqvar",
+        "nodes.merge.ineq",
+        "nodes.base.eqvar",
+        "nodes.base.ineq"};
+
     enum Stat
     {
         SUBF_CNT,
         SUBF_PREC,
+        SUBF_PREC_NONTRIV,
         SUBF_CONST,
+        SUBF_TOP_PREC,
+        SUBF_TOP_PREC_NONTRIV,
+        SUBF_TOP_CONST,
         NODES_CNT,
         NODES_MERGE_EQNUM,
         NODES_MERGE_EQVAR,
